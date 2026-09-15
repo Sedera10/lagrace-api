@@ -16,6 +16,7 @@ import mg.lagrace.api.jwt.JwtUtil;
 import mg.lagrace.api.services.AuthService;
 import mg.lagrace.api.dto.ApiResponse;
 import mg.lagrace.api.dto.LoginRequest;
+import mg.lagrace.api.dto.LoginResponse;
 
 @RestController
 @RequestMapping("/auth")
@@ -30,14 +31,15 @@ public class AuthController {
         this.authService = authService;
     }
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Object>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
             String token = jwtUtil.generateToken(authentication.getName());
+                var user = authService.getUserResponse(authentication.getName());
 
-            return ResponseEntity.ok(ApiResponse.success(
-                    java.util.Map.of("token", token), "Authentification réussie"));
+                return ResponseEntity.ok(ApiResponse.success(
+                    new LoginResponse(token, user), "Authentification réussie"));
         } catch (AuthenticationException exception) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     ApiResponse.error("AUTHENTICATION_FAILED",

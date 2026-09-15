@@ -1,7 +1,7 @@
 package mg.lagrace.api.controllers;
 
 import mg.lagrace.api.dto.ApiResponse;
-import mg.lagrace.api.models.User;
+import mg.lagrace.api.dto.UserResponse;
 import mg.lagrace.api.services.UserService;
 
 import java.util.List;
@@ -21,8 +21,8 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<User>>> Teste() {
-        List<User> users = userService.getUsers();
+    public ResponseEntity<ApiResponse<List<UserResponse>>> Teste() {
+        List<UserResponse> users = userService.getUsers();
         return ResponseEntity.ok(ApiResponse.success(users, "Liste des Utilisateurs"));
     }
 }
