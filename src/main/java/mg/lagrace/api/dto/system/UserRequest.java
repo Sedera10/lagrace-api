@@ -1,15 +1,14 @@
-package mg.lagrace.api.dto;
+package mg.lagrace.api.dto.system;
 
 import java.time.LocalDate;
 import java.util.Set;
 
-public record UserResponse(
-        Long idUser,
+public record UserRequest(
         String lastName,
         String firstName,
         LocalDate birthDate,
         String username,
         String email,
-        boolean active,
-        Set<String> roles) {
-}
+        String password,
+        Boolean active,
+        Set<Long> roleIds) {}

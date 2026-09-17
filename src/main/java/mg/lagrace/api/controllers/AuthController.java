@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import mg.lagrace.api.jwt.JwtUtil;
 import mg.lagrace.api.services.AuthService;
 import mg.lagrace.api.dto.ApiResponse;
-import mg.lagrace.api.dto.LoginRequest;
-import mg.lagrace.api.dto.LoginResponse;
+import mg.lagrace.api.dto.auth.LoginRequest;
+import mg.lagrace.api.dto.auth.LoginResponse;
 
 @RestController
 @RequestMapping("/auth")

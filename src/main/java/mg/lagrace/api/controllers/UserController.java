@@ -1,7 +1,7 @@
 package mg.lagrace.api.controllers;
 
 import mg.lagrace.api.dto.ApiResponse;
-import mg.lagrace.api.dto.UserResponse;
+import mg.lagrace.api.dto.user.UserResponse;
 import mg.lagrace.api.services.UserService;
 
 import java.util.List;

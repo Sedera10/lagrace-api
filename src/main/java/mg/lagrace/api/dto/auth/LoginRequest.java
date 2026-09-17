@@ -1,4 +1,4 @@
-package mg.lagrace.api.dto;
+package mg.lagrace.api.dto.auth;
 
 public record LoginRequest(String username, String password) {
 }

@@ -5,9 +5,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import mg.lagrace.api.dto.UserResponse;
+import mg.lagrace.api.dto.user.UserResponse;
 import mg.lagrace.api.models.Role;
-import mg.lagrace.api.models.User;
 import mg.lagrace.api.repositories.UserRepository;
 
 @Service

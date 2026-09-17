@@ -4,9 +4,10 @@ import org.springframework.stereotype.Service;
 
 import mg.lagrace.api.repositories.RevokedTokenRepository;
 import mg.lagrace.api.repositories.UserRepository;
+import mg.lagrace.api.dto.user.UserResponse;
 import mg.lagrace.api.models.RevokedToken;
 import mg.lagrace.api.models.User;
-import mg.lagrace.api.dto.UserResponse;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
