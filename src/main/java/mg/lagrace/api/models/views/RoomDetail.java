@@ -34,6 +34,9 @@ public class RoomDetail {
     @Column(name = "zone")
     private String zone;
 
+    @Column(name = "description")
+    private String description;
+
     @Column(name = "status_id")
     private Integer statusId;
 
@@ -88,6 +91,7 @@ public class RoomDetail {
     public String getRefRoom() { return refRoom; }
     public Integer getFloor() { return floor; }
     public String getZone() { return zone; }
+    public String getDescription() { return description; }
     public Integer getStatusId() { return statusId; }
     public String getStatus() { return status; }
     public String getColor() { return color; }

@@ -5,6 +5,7 @@ import mg.lagrace.api.dto.room.EquipmentRequest;
 import mg.lagrace.api.dto.room.RoomCategoryRequest;
 import mg.lagrace.api.dto.room.RoomStatusRequest;
 import mg.lagrace.api.dto.room.RoomTypeRequest;
+import mg.lagrace.api.dto.room.RoomTypeResponse;
 import mg.lagrace.api.models.Equipment;
 import mg.lagrace.api.models.RoomCategory;
 import mg.lagrace.api.models.RoomStatus;
@@ -92,31 +93,44 @@ public class RoomConfigController {
     // TYPES
     // =======================================
     @GetMapping("/types")
-    public ResponseEntity<ApiResponse<List<RoomType>>> getTypes() {
+    public ResponseEntity<ApiResponse<List<RoomTypeResponse>>> getTypes() {
         List<RoomType> types = service.getRoomTypes();
-        return ResponseEntity.ok(ApiResponse.success(types));
+        return ResponseEntity.ok(ApiResponse.success(types.stream().map(this::toRoomTypeResponse).toList()));
     }
 
     @PostMapping("/types")
-    public ResponseEntity<ApiResponse<RoomType>> addType(@RequestBody RoomTypeRequest request) {
+    public ResponseEntity<ApiResponse<RoomTypeResponse>> addType(@RequestBody RoomTypeRequest request) {
         RoomType created = service.addType(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created, "Type créé avec succès."));
+                .body(ApiResponse.success(toRoomTypeResponse(created), "Type créé avec succès."));
     }
 
     @PutMapping("/types/{id}")
-    public ResponseEntity<ApiResponse<RoomType>> updateType(
+    public ResponseEntity<ApiResponse<RoomTypeResponse>> updateType(
             @PathVariable Long id,
             @RequestBody RoomTypeRequest request) {
         RoomType updated = service.updateType(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updated, "Type mis à jour avec succès."));
+        return ResponseEntity.ok(ApiResponse.success(toRoomTypeResponse(updated), "Type mis à jour avec succès."));
     }
 
     @DeleteMapping("/types/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteType(@PathVariable Long id) {
         service.deleteType(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Type supprimé avec succès."));
+    }
+
+    private RoomTypeResponse toRoomTypeResponse(RoomType type) {
+        return new RoomTypeResponse(
+                type.getIdType(),
+                type.getCategory().getIdCategory(),
+                type.getCategory().getName(),
+                type.getName(),
+                type.getDescription(),
+                type.getIsAirConditioned(),
+                type.getDefaultCapacity(),
+                type.getCreatedAt(),
+                type.getUpdatedAt());
     }
 
     // =======================================
