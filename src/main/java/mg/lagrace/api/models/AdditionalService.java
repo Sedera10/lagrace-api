@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 import jakarta.persistence.*;
+import mg.lagrace.api.models.enums.CateringCondition;
 
 @Entity
 @Table(name = "additional_service")
@@ -23,6 +24,9 @@ public class AdditionalService {
     private BigDecimal price;
     @Column(name = "is_deposit", nullable = false)
     private boolean deposit;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "catering_condition", length = 20)
+    private CateringCondition cateringCondition;
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -42,6 +46,8 @@ public class AdditionalService {
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
     public boolean isDeposit() { return deposit; }
+    public CateringCondition getCateringCondition () { return cateringCondition; }
+    public void setCateringCondition(CateringCondition withCatering) { this.cateringCondition = withCatering; }
     public void setDeposit(boolean deposit) { this.deposit = deposit; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }

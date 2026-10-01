@@ -1,11 +1,11 @@
 package mg.lagrace.api.controllers;
 
 import mg.lagrace.api.dto.ApiResponse;
-import mg.lagrace.api.dto.room.EquipmentRequest;
 import mg.lagrace.api.dto.room.RoomCategoryRequest;
 import mg.lagrace.api.dto.room.RoomStatusRequest;
 import mg.lagrace.api.dto.room.RoomTypeRequest;
 import mg.lagrace.api.dto.room.RoomTypeResponse;
+import mg.lagrace.api.dto.room.equipment.EquipmentRequest;
 import mg.lagrace.api.models.Equipment;
 import mg.lagrace.api.models.RoomCategory;
 import mg.lagrace.api.models.RoomStatus;

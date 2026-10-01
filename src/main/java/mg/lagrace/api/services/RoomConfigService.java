@@ -5,10 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import jakarta.validation.ValidationException;
-import mg.lagrace.api.dto.room.EquipmentRequest;
 import mg.lagrace.api.dto.room.RoomCategoryRequest;
 import mg.lagrace.api.dto.room.RoomStatusRequest;
 import mg.lagrace.api.dto.room.RoomTypeRequest;
+import mg.lagrace.api.dto.room.equipment.EquipmentRequest;
 import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.models.Equipment;
@@ -40,7 +40,7 @@ public class RoomConfigService {
     // GESTION STATUS DE CHAMBRE
     // =======================================
     public List<RoomStatus> getRoomStatus() {
-        return statusRepository.findAll();
+        return statusRepository.findAllByOrderByIdStatus();
     }
     public RoomStatus addStatus(RoomStatusRequest request) {
         if (request == null || request.name() == null || request.name().isBlank()) {

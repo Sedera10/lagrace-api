@@ -13,6 +13,9 @@ public class RoomPhoto {
     @Column(name = "url", nullable = false, columnDefinition = "TEXT")
     private String url;
 
+    @Column(name = "public_id", nullable = false)
+    private String publicId;
+
     @Column(name = "caption", length = 255)
     private String caption;
 
@@ -43,5 +46,11 @@ public class RoomPhoto {
 
     public Room getRoom() { return room; }
     public void setRoom(Room room) { this.room = room; }
+
+    public String getPublicId() { return publicId; }
+    public void setPublicId(String publicId) { this.publicId = publicId; }
+
+    public RoomType getType() { return type; }
+    public void setType(RoomType type) { this.type = type; }
 
 }
