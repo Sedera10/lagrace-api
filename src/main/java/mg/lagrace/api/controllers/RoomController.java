@@ -4,11 +4,15 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import mg.lagrace.api.dto.ApiResponse;
+import mg.lagrace.api.dto.photo.PhotoResponse;
+import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
 import mg.lagrace.api.dto.room.RoomRequest;
 import mg.lagrace.api.dto.room.RoomStatusHistoryResponse;
 import mg.lagrace.api.dto.room.photo.RoomPhotoResponse;
+import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.RoomService;
 import mg.lagrace.api.models.RoomPhoto;
+import mg.lagrace.api.models.enums.PhotoItemType;
 import mg.lagrace.api.models.views.RoomDetail;
 import mg.lagrace.api.models.views.RoomPhotoView;
 
@@ -34,9 +38,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 @RequestMapping("/rooms")
 public class RoomController {
     private final RoomService roomService;
+    private final PhotoService photoService;
 
-    public RoomController(RoomService roomService) {
+    public RoomController(RoomService roomService, PhotoService photoService) {
         this.roomService = roomService;
+        this.photoService = photoService;
     }
 
     @GetMapping
@@ -96,41 +102,50 @@ public class RoomController {
     }
 
     @GetMapping("{id}/photos")
-    public ResponseEntity<ApiResponse<List<RoomPhotoView>>> roomPhotos(@PathVariable Integer id) {
-        List<RoomPhotoView> photos = roomService.getRoomPhotos(id);
+    public ResponseEntity<ApiResponse<List<PhotoResponse>>> roomPhotos(@PathVariable Long id) {
+        List<PhotoResponse> photos = photoService.listByItem(PhotoItemType.ROOM, id);
         return ResponseEntity.ok(ApiResponse.success(photos, "Les photos (hors couverture) de la chambre " + id));
     }
 
     @PostMapping(value = "/{roomId}/photos",consumes = "multipart/form-data"
     )
-    public ResponseEntity<ApiResponse<RoomPhotoResponse>> uploadRoomPhoto(
+    public ResponseEntity<ApiResponse<PhotoResponse>> uploadRoomPhoto(
             @PathVariable Long roomId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String caption,
+            @RequestParam(required = false) String altText,
             @RequestParam(defaultValue = "false") boolean isCover
     ) throws IOException {
 
-        RoomPhoto saved = roomService.uploadForRoom(
-                roomId, file, caption, isCover
+        PhotoResponse saved = photoService.upload(
+               PhotoItemType.ROOM ,roomId, file, caption, altText, isCover
         );
 
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(RoomPhotoResponse.from(saved), "Photo de chambre ajoutée avec succès."));
+            .body(ApiResponse.success(saved, "Photo de chambre ajoutée avec succès."));
     }
 
     @DeleteMapping("/photos/{photoId}")
     public ResponseEntity<ApiResponse<Void>> deleteRoomPhoto(@PathVariable Long photoId) throws IOException {
-        roomService.deletePhoto(photoId);
+        photoService.delete(photoId);
         return ResponseEntity.ok(ApiResponse.success(null, "Photo de chambre supprimée avec succès."));
     }
 
+    @PutMapping("/photos/{photoId}")
+    public ResponseEntity<ApiResponse<PhotoResponse>> updateRoomPhoto(
+            @PathVariable Long photoId, @RequestBody UpdatePhotoRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                photoService.update(photoId, request), "Photo de chambre modifiée avec succès."));
+    }
+
     @PatchMapping("/{roomId}/photos/{photoId}/cover")
-    public ResponseEntity<ApiResponse<RoomPhotoResponse>> setCoverPhoto(
+    public ResponseEntity<ApiResponse<Void>> setCoverPhoto(
             @PathVariable Long roomId,
             @PathVariable Long photoId
     ) {
-        RoomPhoto photo = roomService.setCoverPhoto(roomId, photoId);
-        return ResponseEntity.ok(ApiResponse.success(RoomPhotoResponse.from(photo), "Photo définie comme couverture."));
+        photoService.assertBelongsTo(photoId, PhotoItemType.ROOM, roomId);
+        photoService.setCover(photoId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Photo définie comme couverture."));
     }
-    
+
 }
