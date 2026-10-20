@@ -2,6 +2,7 @@ package mg.lagrace.api.services;
 
 import java.time.LocalDate;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -10,15 +11,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import mg.lagrace.api.dto.pool.PoolRateRequest;
+import mg.lagrace.api.dto.pool.PoolRateResponse;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.models.Pool;
 import mg.lagrace.api.models.PoolRate;
 import mg.lagrace.api.models.PoolService;
+import mg.lagrace.api.models.Space;
 import mg.lagrace.api.models.Unit;
-import mg.lagrace.api.models.views.PoolRateDetail;
 import mg.lagrace.api.repositories.PoolRepository;
-import mg.lagrace.api.repositories.PoolRateDetailRepository;
 import mg.lagrace.api.repositories.PoolRateRepository;
 import mg.lagrace.api.repositories.PoolServiceRepository;
 import mg.lagrace.api.repositories.UnitRepository;
@@ -26,65 +27,73 @@ import mg.lagrace.api.repositories.UnitRepository;
 @Service
 public class PoolManagmentService {
     private final PoolRateRepository rateRepo;
-    private final PoolRateDetailRepository rateDetailRepo;
     private final PoolRepository poolRepo;
     private final PoolServiceRepository poolServiceRepo;
     private final UnitRepository unitRepo;
 
     public PoolManagmentService(
             PoolRateRepository rateRepo,
-            PoolRateDetailRepository rateDetailRepo,
             PoolRepository poolRepo,
             PoolServiceRepository poolServiceRepo,
             UnitRepository unitRepo) {
         this.rateRepo = rateRepo;
-        this.rateDetailRepo = rateDetailRepo;
         this.poolRepo = poolRepo;
         this.poolServiceRepo = poolServiceRepo;
         this.unitRepo = unitRepo;
     }
 
-    // =========== LISTE - GET ============
-    public List<PoolRateDetail> allRates(Long poodId){
-        return rateDetailRepo.findByPoolId(poodId);
+    public List<Pool> getPools() {
+        return poolRepo.findAll();
     }
 
-    public List<PoolRateDetail> currentRates(Long poolId, LocalDate date) {
-        LocalDate dateTest = (date != null) ? date : LocalDate.now();
-        return rateDetailRepo.findApplicableRates(poolId, dateTest);
+    // =========== LISTE - GET (Tarifs) ============
+    @Transactional(readOnly = true)
+    public List<PoolRateResponse> allRates(Long poolId){
+        return rateRepo.findByPool_IdPoolOrderByService_IdServiceAscUnit_IdUnitAscValidFromDesc(poolId)
+                .stream()
+                .map(PoolRateResponse::from)
+                .toList();
     }
 
-    public List<PoolRateDetail> otherRates(Long poolId, LocalDate date) {
-        LocalDate dateTest = (date != null) ? date : LocalDate.now();
+    @Transactional(readOnly = true)
+    public List<PoolRateResponse> currentRates(Long poolId, LocalDate date) {
+        LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
+        List<PoolRate> currentRates = new ArrayList<>();
+        for (PoolService service : poolServiceRepo.findAll()) {
+            currentRates.addAll(rateRepo.findApplicableByPoolAndService(
+                    poolId,
+                    service.getIdService(),
+                    effectiveDate));
+        }
+        return currentRates.stream()
+                .map(PoolRateResponse::from)
+                .toList();
+    }
 
-        List<PoolRateDetail> currentRates =
-                rateDetailRepo.findApplicableRates(poolId, dateTest);
-
-        List<PoolRateDetail> allRates =
-                rateDetailRepo.findByPoolId(poolId);
-
-        Set<Long> currentIds = currentRates.stream()
-                .map(PoolRateDetail::getIdRate)
+    @Transactional(readOnly = true)
+    public List<PoolRateResponse> otherRates(Long poolId, LocalDate date) {
+        Set<Long> currentIds = currentRates(poolId, date).stream()
+                .map(PoolRateResponse::idRate)
                 .collect(Collectors.toSet());
 
-        return allRates.stream()
+        return rateRepo.findByPool_IdPoolOrderByService_IdServiceAscUnit_IdUnitAscValidFromDesc(poolId)
+                .stream()
                 .filter(rate -> !currentIds.contains(rate.getIdRate()))
+                .map(PoolRateResponse::from)
                 .toList();
     }
 
     // ======= CREATE / UPDATE =========
     @Transactional
-    public PoolRateDetail SaveOrUpdatePoolRate(PoolRateRequest request){
+    public PoolRateResponse SaveOrUpdatePoolRate(PoolRateRequest request) {
         validateRequest(request);
-
         PoolRate rate = new PoolRate();
         apply(rate, request);
-        PoolRate saved = rateRepo.saveAndFlush(rate);
-        return detailOf(saved.getIdRate());
+        return PoolRateResponse.from(rateRepo.saveAndFlush(rate));
     }
 
     @Transactional
-    public PoolRateDetail updatePoolRate(Long idRate, PoolRateRequest request) {
+    public PoolRateResponse updatePoolRate(Long idRate, PoolRateRequest request) {
         validateRequest(request);
 
         if (idRate == null) {
@@ -94,10 +103,8 @@ public class PoolManagmentService {
         PoolRate rate = rateRepo.findById(idRate)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tarif piscine introuvable avec l'id " + idRate));
-
         apply(rate, request);
-        PoolRate saved = rateRepo.saveAndFlush(rate);
-        return detailOf(saved.getIdRate());
+        return PoolRateResponse.from(rateRepo.saveAndFlush(rate));
     }
 
     @Transactional
@@ -149,9 +156,6 @@ public class PoolManagmentService {
                     "Un tarif par âge doit avoir les âges renseignés et aucun repas ; "
                             + "un tarif repas doit avoir le champ repas renseigné et aucun âge.");
         }
-        if (Boolean.TRUE.equals(request.temporary()) && request.validTo() == null) {
-            throw new ValidationException("Un tarif temporaire doit avoir une date de fin.");
-        }
     }
 
     private void apply(PoolRate rate, PoolRateRequest request) {
@@ -172,14 +176,8 @@ public class PoolManagmentService {
         rate.setMinAge(request.minAge());
         rate.setMaxAge(request.maxAge());
         rate.setAmount(request.amount());
-        rate.setTemporary(Boolean.TRUE.equals(request.temporary()));
         rate.setValidFrom(request.validFrom());
         rate.setValidTo(request.validTo());
     }
 
-    private PoolRateDetail detailOf(Long idRate) {
-        return rateDetailRepo.findById(idRate)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Tarif piscine introuvable après sauvegarde avec l'id " + idRate));
-    }
 }

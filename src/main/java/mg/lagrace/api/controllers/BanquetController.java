@@ -1,6 +1,7 @@
 package mg.lagrace.api.controllers;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import mg.lagrace.api.dto.ApiResponse;
@@ -36,15 +38,23 @@ public class BanquetController {
     }
 
     @GetMapping("/rates/current")
-    public ResponseEntity<ApiResponse<List<BanquetRateResponse>>> getCurrentRates() {
+    public ResponseEntity<ApiResponse<List<BanquetRateResponse>>> getCurrentRates(
+            @RequestParam(required = false) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
-                banquetService.getCurrentRates(), "Tarifs banquet actuels récupérés avec succès."));
+                banquetService.getCurrentRates(date), "Tarifs banquet actuels récupérés avec succès."));
+    }
+
+    @GetMapping("/rates")
+    public ResponseEntity<ApiResponse<List<BanquetRateResponse>>> getRates() {
+        return ResponseEntity.ok(ApiResponse.success(
+                banquetService.getRates(), "Tarifs banquet récupérés avec succès."));
     }
 
     @GetMapping("/rates/others")
-    public ResponseEntity<ApiResponse<List<BanquetRateResponse>>> getOtherRates() {
+    public ResponseEntity<ApiResponse<List<BanquetRateResponse>>> getOtherRates(
+            @RequestParam(required = false) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
-                banquetService.getOtherRates(), "Autres tarifs banquet récupérés avec succès."));
+                banquetService.getOtherRates(date), "Autres tarifs banquet récupérés avec succès."));
     }
 
     @PostMapping("/rates")

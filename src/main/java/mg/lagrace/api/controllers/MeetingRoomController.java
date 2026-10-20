@@ -1,10 +1,12 @@
 package mg.lagrace.api.controllers;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import mg.lagrace.api.dto.ApiResponse;
 import mg.lagrace.api.dto.meeting.MeetingRoomRateRequest;
@@ -41,6 +43,18 @@ public class MeetingRoomController {
 
     @GetMapping("/rates")
     public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> listRates() { return ResponseEntity.ok(ApiResponse.success(service.listRates())); }
+
+    @GetMapping("/rates/current")
+    public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> currentRates(
+            @RequestParam(required = false) LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(service.currentRates(date)));
+    }
+
+    @GetMapping("/rates/others")
+    public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> otherRates(
+            @RequestParam(required = false) LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(service.otherRates(date)));
+    }
 
     @PostMapping("/rates")
     public ResponseEntity<ApiResponse<MeetingRoomRateResponse>> createRate(@RequestBody MeetingRoomRateRequest request) { return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(service.createRate(request))); }

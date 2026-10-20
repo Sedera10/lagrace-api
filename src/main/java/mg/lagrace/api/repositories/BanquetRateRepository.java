@@ -14,21 +14,19 @@ public interface BanquetRateRepository extends JpaRepository<BanquetRate, Long> 
     List<BanquetRate> findAllByMenuType_IdMenuType(Long idMenuType);
     List<BanquetRate> findAllByMenuType(BanquetMenuType menuType);
 
-        @Query("""
-                        SELECT rate
-                        FROM BanquetRate rate
-                        WHERE rate.validFrom <= :date
-                            AND (rate.validTo IS NULL OR rate.validTo >= :date)
-                        ORDER BY rate.menuType.idMenuType, rate.minPersons
-                        """)
-        List<BanquetRate> findAllCurrentAt(@Param("date") LocalDate date);
+    List<BanquetRate> findAllByOrderByMenuType_IdMenuTypeAscMinPersonsAscValidFromDesc();
 
-        @Query("""
-                SELECT rate
-                FROM BanquetRate rate
-                WHERE rate.validTo < :date
-                   OR rate.validFrom > :date
-                ORDER BY rate.menuType.idMenuType, rate.validFrom DESC, rate.minPersons
-                """)
-        List<BanquetRate> findAllOtherThanCurrentAt(@Param("date") LocalDate date);
+    @Query(value = """
+        SELECT DISTINCT ON (min_persons, max_persons) *
+        FROM banquet_rate
+        WHERE menu_type_id = CAST(:menuTypeId AS integer)
+          AND valid_from <= :date
+          AND (valid_to IS NULL OR valid_to >= :date)
+        ORDER BY min_persons, max_persons,
+                 (valid_to IS NULL),
+                 valid_from DESC,
+                 id_rate DESC
+        """, nativeQuery = true)
+    List<BanquetRate> findApplicableByMenuType(@Param("menuTypeId") Long menuTypeId,
+                                               @Param("date") LocalDate date);
 }

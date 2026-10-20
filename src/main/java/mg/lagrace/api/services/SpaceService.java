@@ -1,6 +1,9 @@
 package mg.lagrace.api.services;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -92,17 +95,57 @@ public class SpaceService {
 
 
     // ========= TARIFS =========
+    @Transactional(readOnly = true)
     public List<SpaceRateResponse> getTarifs(Long idSpace) {
-        Space space = spaceRepo.findById(idSpace)
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Espace introuvable avec l'id : " + idSpace));
+        spaceRepo.findById(idSpace)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Espace introuvable avec l'id : " + idSpace));
 
-        List<SpaceRate> rates = spaceRateRepo.findAllBySpace(space);
+        List<SpaceRate> rates = spaceRateRepo.findBySpace_IdSpaceOrderByUnit_IdUnitAscMinPersonAscValidFromDesc(idSpace);
         return rates.stream()
             .map(SpaceRateResponse::from)
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<SpaceRateResponse> currentRates(Long idSpace, LocalDate daty) {
+        spaceRepo.findById(idSpace)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Espace introuvable avec l'id : " + idSpace));
+
+        LocalDate newDate = (daty != null) ? daty : LocalDate.now();
+        List<SpaceRate> rates = spaceRateRepo.findApplicableBySpace(idSpace, newDate);
+
+        return rates.stream()
+            .map(SpaceRateResponse::from)
+            .toList();
+    }
+
+
+    @Transactional(readOnly = true)
+    public List<SpaceRateResponse> othersRates(Long idSpace, LocalDate daty) {
+        spaceRepo.findById(idSpace)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Espace introuvable avec l'id : " + idSpace));
+
+        LocalDate newDate = (daty != null) ? daty : LocalDate.now();
+        List<SpaceRate> allRates = spaceRateRepo.findBySpace_IdSpaceOrderByUnit_IdUnitAscMinPersonAscValidFromDesc(idSpace);
+        List<SpaceRate> rates = spaceRateRepo.findApplicableBySpace(idSpace, newDate);
+
+        Set<Long> rateIds = rates.stream()
+            .map(SpaceRate::getIdRate)
+            .collect(Collectors.toSet());
+
+        List<SpaceRate> remainingRates = allRates.stream()
+            .filter(rate -> !rateIds.contains(rate.getIdRate()))
+            .toList();
+
+        return remainingRates.stream()
+            .map(SpaceRateResponse::from)
+            .toList();
+    }
+
+    @Transactional
     public SpaceRateResponse updateTarif(Long idRate, SpaceRateRequest request) {
         if (idRate == null) {
             throw new ValidationException("L'identifiant du tarif est obligatoire.");
@@ -110,6 +153,7 @@ public class SpaceService {
         return saveTarif(idRate, request);
     }
 
+    @Transactional
     public void deleteTarif(Long idRate) {
         if (idRate == null) {
             throw new ValidationException("L'identifiant du tarif est obligatoire.");
@@ -121,6 +165,7 @@ public class SpaceService {
         spaceRateRepo.delete(rate);
     }
 
+    @Transactional
     public SpaceRateResponse addTarif(SpaceRateRequest request){
         return saveTarif(null, request);
     }

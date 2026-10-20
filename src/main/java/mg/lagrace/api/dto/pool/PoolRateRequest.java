@@ -11,7 +11,6 @@ public record PoolRateRequest(
     Integer minAge,
     Integer maxAge,
     BigDecimal amount,
-    Boolean temporary,
     LocalDate validFrom,
     LocalDate validTo
 ) {}

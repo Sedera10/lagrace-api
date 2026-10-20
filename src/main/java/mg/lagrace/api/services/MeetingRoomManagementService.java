@@ -3,6 +3,8 @@ package mg.lagrace.api.services;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,8 +17,6 @@ import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.models.MeetingRoom;
 import mg.lagrace.api.models.MeetingRoomRate;
-import mg.lagrace.api.models.MeetingRoomService;
-import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.MeetingRoomRateRepository;
 import mg.lagrace.api.repositories.MeetingRoomRepository;
 import mg.lagrace.api.repositories.MeetingRoomServiceRepository;
@@ -44,6 +44,29 @@ public class MeetingRoomManagementService {
     @Transactional(readOnly = true)
     public List<MeetingRoomRateResponse> listRates() {
         return rates.findAllByOrderByValidFromDesc().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MeetingRoomRateResponse> currentRates(LocalDate date) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        return services.findAll().stream()
+                .flatMap(service -> rates.findApplicableByService(
+                        service.getIdService(),
+                        effectiveDate).stream())
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MeetingRoomRateResponse> otherRates(LocalDate date) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        Set<Long> currentIds = currentRates(effectiveDate).stream()
+                .map(MeetingRoomRateResponse::idRate)
+                .collect(Collectors.toSet());
+        return rates.findAllByOrderByValidFromDesc().stream()
+                .filter(rate -> !currentIds.contains(rate.getIdRate()))
+                .map(this::toResponse)
+                .toList();
     }
 
     public MeetingRoom createRoom(MeetingRoomRequest request) {
@@ -105,13 +128,18 @@ public class MeetingRoomManagementService {
 
     @Transactional
     public MeetingRoomRateResponse updateRate(Long id, MeetingRoomRateRequest request) {
+        if (id == null) throw new ValidationException("L'identifiant du tarif est obligatoire.");
         validateRate(request);
         MeetingRoomRate rate = rates.findById(id).orElseThrow(() -> missing("Tarif de salle de réunion", id));
         apply(rate, request);
         return toResponse(rates.save(rate));
     }
 
-    public void deleteRate(Long id) { rates.delete(rates.findById(id).orElseThrow(() -> missing("Tarif de salle de réunion", id))); }
+    @Transactional
+    public void deleteRate(Long id) {
+        if (id == null) throw new ValidationException("L'identifiant du tarif est obligatoire.");
+        rates.delete(rates.findById(id).orElseThrow(() -> missing("Tarif de salle de réunion", id)));
+    }
 
     private void apply(MeetingRoom room, MeetingRoomRequest request) {
         room.setName(request.name().trim());

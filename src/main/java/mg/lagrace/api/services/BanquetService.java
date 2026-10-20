@@ -3,6 +3,8 @@ package mg.lagrace.api.services;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,19 +40,39 @@ public class BanquetService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<BanquetRateResponse> getCurrentRates() {
-		return toResponses(rateRepository.findAllCurrentAt(LocalDate.now()));
+	public List<BanquetRateResponse> getRates() {
+		return toResponses(rateRepository.findAllByOrderByMenuType_IdMenuTypeAscMinPersonsAscValidFromDesc());
 	}
 
 	@Transactional(readOnly = true)
-	public List<BanquetRateResponse> getOtherRates() {
-		return toResponses(rateRepository.findAllOtherThanCurrentAt(LocalDate.now()));
+	public List<BanquetRateResponse> getCurrentRates(LocalDate date) {
+		LocalDate effectiveDate = date != null ? date : LocalDate.now();
+		List<BanquetRate> applicableRates = menuTypeRepository.findAll().stream()
+				.flatMap(menuType -> rateRepository.findApplicableByMenuType(
+						menuType.getIdMenuType(),
+						effectiveDate).stream())
+				.toList();
+		return toResponses(applicableRates);
 	}
 
+	@Transactional(readOnly = true)
+	public List<BanquetRateResponse> getOtherRates(LocalDate date) {
+		LocalDate effectiveDate = date != null ? date : LocalDate.now();
+		Set<Long> currentIds = getCurrentRates(effectiveDate).stream()
+				.map(BanquetRateResponse::idRate)
+				.collect(Collectors.toSet());
+		return toResponses(rateRepository.findAllByOrderByMenuType_IdMenuTypeAscMinPersonsAscValidFromDesc()
+				.stream()
+				.filter(rate -> !currentIds.contains(rate.getIdRate()))
+				.toList());
+	}
+
+	@Transactional
 	public BanquetRateResponse addRate(BanquetRateRequest request) {
 		return saveRate(null, request);
 	}
 
+	@Transactional
 	public BanquetRateResponse updateRate(Long idRate, BanquetRateRequest request) {
 		if (idRate == null) {
 			throw new ValidationException("L'identifiant du tarif est obligatoire.");
@@ -58,6 +80,7 @@ public class BanquetService {
 		return saveRate(idRate, request);
 	}
 
+	@Transactional
 	public void deleteRate(Long idRate) {
 		if (idRate == null) {
 			throw new ValidationException("L'identifiant du tarif est obligatoire.");

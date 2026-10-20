@@ -37,9 +37,6 @@ public class PoolRate {
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "is_temporary", nullable = false)
-    private Boolean temporary;
-
     @Column(name = "valid_from", nullable = false)
     private LocalDate validFrom;
 
@@ -70,10 +67,33 @@ public class PoolRate {
     public void setMinAge(Integer minAge) { this.minAge = minAge; }
     public Integer getMaxAge() { return maxAge; }
     public void setMaxAge(Integer maxAge) { this.maxAge = maxAge; }
+    @Transient
+    public String getAgeLabel() {
+        if (maxAge != null && (minAge == null || minAge == 0 || minAge == 1)) {
+            return "Moins de " + (maxAge) + " ans";
+        }
+        if (minAge != null && maxAge != null) {
+            return minAge + " - " + maxAge + " ans";
+        }
+        if (minAge != null) {
+            return (minAge - 1) + " ans et plus";
+        }
+        return null;
+    }
+
+    @Transient
+    public String getMealLabel() {
+        if (Boolean.TRUE.equals(isMealIncluded)) {
+            return "Avec repas";
+        }
+        if (Boolean.FALSE.equals(isMealIncluded)) {
+            return "Sans repas";
+        }
+        return null;
+    }
+
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public Boolean getTemporary() { return temporary; }
-    public void setTemporary(Boolean temporary) { this.temporary = temporary; }
     public LocalDate getValidFrom() { return validFrom; }
     public void setValidFrom(LocalDate validFrom) { this.validFrom = validFrom; }
     public LocalDate getValidTo() { return validTo; }
