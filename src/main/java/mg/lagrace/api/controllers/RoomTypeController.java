@@ -11,8 +11,11 @@ import mg.lagrace.api.dto.room.equipment.RoomTypeEquipmentResponse;
 import mg.lagrace.api.dto.room.equipment.UpdateRoomTypeEquipmentRequest;
 import mg.lagrace.api.dto.room.photo.RoomPhotoResponse;
 import mg.lagrace.api.dto.room.photo.UpdateRoomPhotoRequest;
+import mg.lagrace.api.dto.room.rate.CreateRoomRateRequest;
+import mg.lagrace.api.dto.room.rate.RoomRateResponse;
 import mg.lagrace.api.dto.room.rate.RoomTypeRateRow;
 import mg.lagrace.api.dto.room.rate.RoomTypeRateRowRequest;
+import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.RoomTypeService;
 import mg.lagrace.api.models.RoomPhoto;
@@ -161,37 +164,37 @@ public class RoomTypeController {
 
     // ============ TARIFS ===============
     @GetMapping("/{typeId}/tarifs")
-    public ResponseEntity<ApiResponse<List<RoomTypeRateRow>>> getRates(@PathVariable Long typeId) {
-        List<RoomTypeRateRow> tarifs = roomTypeService.getRateRowsByType(typeId);
-        return ResponseEntity.ok(ApiResponse.success(tarifs, "Tarifs du type récupérés"));
+    public ResponseEntity<ApiResponse<List<RoomRateResponse>>> getRates(@PathVariable Long typeId,@RequestParam(required = false) LocalDate date ) {
+        List<RoomRateResponse> tarifs = roomTypeService.listTarifs(typeId, date);
+        return ResponseEntity.ok(ApiResponse.success(tarifs, "Tarifs du type de chambre récupérés"));
     }
 
     @PostMapping("/{typeId}/tarifs")
-    public ResponseEntity<ApiResponse<RoomTypeRateRow>> addRate(
+    public ResponseEntity<ApiResponse<RoomRateResponse>> addRate(
             @PathVariable Long typeId,
-            @RequestBody RoomTypeRateRowRequest request
+            @RequestBody CreateRoomRateRequest  request
     ) {
-        RoomTypeRateRow saved = roomTypeService.upsertRateRowForType(typeId, request);
+        RoomRateResponse saved = roomTypeService.createRate(typeId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(saved, "Tarif ajouté avec succès"));
     }
 
-    @PutMapping("/{typeId}/tarifs")
-    public ResponseEntity<ApiResponse<RoomTypeRateRow>> updateRate(
+    @PutMapping("/{typeId}/tarifs/{rateId}")
+    public ResponseEntity<ApiResponse<RoomRateResponse>> updateRate(
             @PathVariable Long typeId,
-            @RequestBody RoomTypeRateRowRequest request
+            @PathVariable Long rateId,
+            @RequestBody UpdateRoomRateRequest request
     ) {
-        RoomTypeRateRow updated = roomTypeService.upsertRateRowForType(typeId, request);
+        RoomRateResponse updated = roomTypeService.updateRate(typeId, rateId, request);
         return ResponseEntity.ok(ApiResponse.success(updated, "Tarif mis à jour avec succès"));
     }
 
-    @DeleteMapping("/{typeId}/tarifs")
+    @DeleteMapping("/{typeId}/tarifs/{rateId}")
     public ResponseEntity<ApiResponse<Void>> deleteRate(
             @PathVariable Long typeId,
-            @RequestParam("validFrom") LocalDate validFrom,
-            @RequestParam(value = "validTo", required = false) LocalDate validTo
+            @PathVariable Long rateId
     ) {
-        roomTypeService.deleteRateRowForType(typeId, validFrom, validTo);
+        roomTypeService.deleteRate(rateId);
         return ResponseEntity.ok(ApiResponse.success(null, "Tarif supprimé avec succès"));
     }
     

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,9 +18,13 @@ import org.springframework.web.multipart.MultipartFile;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
+
+import mg.lagrace.api.dto.room.rate.CreateRoomRateRequest;
+import mg.lagrace.api.dto.room.rate.RoomRateResponse;
 import mg.lagrace.api.dto.room.rate.RoomTypeRateRow;
 import mg.lagrace.api.dto.room.rate.RoomTypeRateRowRequest;
+import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.models.Equipment;
 import mg.lagrace.api.models.RoomPhoto;
 import mg.lagrace.api.models.RoomRate;
@@ -407,5 +412,109 @@ public class RoomTypeService {
             .map(Unit::getIdUnit)
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Unité chambre introuvable : " + unitName));
+    }
+
+    // =========== TARIFS 2 =========== //
+    @Transactional(readOnly = true)
+    public List<RoomRateResponse> listTarifs(Long typeId, LocalDate date) {
+        if (!roomTypeRepository.existsById(typeId)) {
+            throw new IllegalArgumentException("Type de chambre introuvable");
+        }
+
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+
+        Set<Long> applicableIds = roomRateRepository.findApplicableByType(typeId, effectiveDate).stream()
+                .map(RoomRate::getIdRate)
+                .collect(Collectors.toSet());
+
+        return roomRateRepository.findAllByType(typeId).stream()
+                .map(r -> new RoomRateResponse(
+                        r.getIdRate(), typeId, r.getUnit().getIdUnit(), r.getUnit().getName(),
+                        r.getAmount(), r.getValidFrom(), r.getValidTo(),
+                        applicableIds.contains(r.getIdRate())))
+                .toList();
+    }
+    @Transactional
+    public RoomRateResponse createRate(Long typeId, CreateRoomRateRequest req) {
+        RoomType type = roomTypeRepository.findById(typeId)
+                .orElseThrow(() -> new IllegalArgumentException("Type de chambre introuvable"));
+
+        Unit unit = unitRepository.findById(req.unitId())
+                .orElseThrow(() -> new IllegalArgumentException("Unité introuvable"));
+        if (!ROOM_SERVICE.equalsIgnoreCase(unit.getService())) {
+            throw new IllegalArgumentException("Cette unité ne concerne pas les chambres");
+        }
+
+        checkRules(typeId, unit.getIdUnit(), req.validFrom(), req.validTo(), -1L);
+
+        RoomRate rate = new RoomRate();
+        rate.setType(type);
+        rate.setUnit(unit);
+        rate.setAmount(req.amount());
+        rate.setValidFrom(req.validFrom());
+        rate.setValidTo(req.validTo());
+
+        return toResponse(roomRateRepository.save(rate), LocalDate.now());
+    }
+
+    @Transactional
+    public RoomRateResponse updateRate(Long typeId, Long rateId, UpdateRoomRateRequest req) {
+        RoomRate rate = findOrThrow(rateId);
+        if (!rate.getType().getIdType().equals(typeId)) {
+            throw new IllegalArgumentException("Ce tarif n'appartient pas à ce type de chambre");
+        }
+
+        checkRules(rate.getType().getIdType(), rate.getUnit().getIdUnit(),
+                req.validFrom(), req.validTo(), rateId);
+
+        rate.setAmount(req.amount());
+        rate.setValidFrom(req.validFrom());
+        rate.setValidTo(req.validTo());
+
+        return toResponse(rate, LocalDate.now());   // entité managée : flush au commit
+    }
+
+    @Transactional
+    public void deleteRate(Long rateId) {
+        roomRateRepository.delete(findOrThrow(rateId));
+    }
+
+    @Transactional(readOnly = true)
+    public RoomRateResponse getRate(Long rateId) {
+        return toResponse(findOrThrow(rateId), LocalDate.now());
+    }
+
+    private void checkRules(Long typeId, Long unitId, LocalDate from, LocalDate to, Long excludeId) {
+        if (to != null && to.isBefore(from)) {
+            throw new IllegalArgumentException("La date de fin doit être après la date de début");
+        }
+
+        if (roomRateRepository.existsByType_IdTypeAndUnit_IdUnitAndValidFromAndIdRateNot(
+                typeId, unitId, from, excludeId)) {
+            throw new IllegalArgumentException("Un tarif commence déjà à cette date pour cette unité");
+        }
+
+        if (to == null) {
+            if (roomRateRepository.existsByType_IdTypeAndUnit_IdUnitAndValidToIsNullAndIdRateNot(
+                    typeId, unitId, excludeId)) {
+                throw new IllegalArgumentException(
+                        "Un tarif permanent existe déjà pour cette unité : fermez-le (date de fin) avant d'en créer un autre");
+            }
+        } else if (roomRateRepository.existsOverlappingPromo(typeId, unitId, from, to, excludeId)) {
+            throw new IllegalArgumentException("Cette période chevauche une autre promotion de la même unité");
+        }
+    }
+    
+    private RoomRateResponse toResponse(RoomRate r, LocalDate date) {
+        boolean applicable = roomRateRepository.findApplicableByType(r.getType().getIdType(), date)
+                .stream().anyMatch(a -> a.getIdRate().equals(r.getIdRate()));
+        return new RoomRateResponse(
+                r.getIdRate(), r.getType().getIdType(), r.getUnit().getIdUnit(), r.getUnit().getName(),
+                r.getAmount(), r.getValidFrom(), r.getValidTo(), applicable);
+    }
+
+    private RoomRate findOrThrow(Long id) {
+        return roomRateRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Tarif introuvable"));
     }
 }
