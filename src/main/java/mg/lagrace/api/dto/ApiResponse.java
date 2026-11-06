@@ -7,7 +7,11 @@ public class ApiResponse<T> {
     private String status;
     private T data;
     private String error;
+    private String code;
+    private String field;
     private String message;
+    private ConflictPeriod conflict;
+    private java.math.BigDecimal newTotal;
     private Long timestamp;
 
     public ApiResponse() {
@@ -20,6 +24,18 @@ public class ApiResponse<T> {
         this.error = error;
         this.message = message;
         this.timestamp = System.currentTimeMillis();
+    }
+
+    public static <T> ApiResponse<T> apiError(String code, String message) {
+        ApiResponse<T> response = new ApiResponse<>("error", null, code, message);
+        response.code = code;
+        return response;
+    }
+
+    public static <T> ApiResponse<T> apiError(String code, String message, String field) {
+        ApiResponse<T> response = apiError(code, message);
+        response.field = field;
+        return response;
     }
 
     // Méthodes statiques pour faciliter la création
@@ -48,10 +64,21 @@ public class ApiResponse<T> {
 
     public String getError() { return error; }
     public void setError(String error) { this.error = error; }
+    public String getCode() { return code == null ? error : code; }
+    public void setCode(String code) { this.code = code; }
+    public String getField() { return field; }
+    public void setField(String field) { this.field = field; }
+
+    public ConflictPeriod getConflict() { return conflict; }
+    public void setConflict(ConflictPeriod conflict) { this.conflict = conflict; }
+    public java.math.BigDecimal getNewTotal() { return newTotal; }
+    public void setNewTotal(java.math.BigDecimal newTotal) { this.newTotal = newTotal; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
     public Long getTimestamp() { return timestamp; }
     public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
+
+    public record ConflictPeriod(String from, String to) {}
 }

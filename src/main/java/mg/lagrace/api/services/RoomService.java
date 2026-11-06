@@ -1,21 +1,22 @@
 package mg.lagrace.api.services;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import java.util.stream.Collectors;
 import java.time.OffsetDateTime;
 import org.springframework.data.domain.PageRequest;
 
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 
 import jakarta.transaction.Transactional;
 import mg.lagrace.api.dto.room.RoomRequest;
+import mg.lagrace.api.dto.room.RoomSearchResponse;
 import mg.lagrace.api.dto.room.RoomStatusHistoryResponse;
 import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
@@ -25,17 +26,13 @@ import mg.lagrace.api.models.RoomPhoto;
 import mg.lagrace.api.models.RoomStatus;
 import mg.lagrace.api.models.RoomStatusHistory;
 import mg.lagrace.api.models.RoomType;
-import mg.lagrace.api.models.User;
 import mg.lagrace.api.models.views.RoomDetail;
-import mg.lagrace.api.models.views.RoomPhotoView;
+import mg.lagrace.api.repositories.RoomRateRepository.ApplicableNightRate;
 import mg.lagrace.api.repositories.RoomDetailRepository;
-import mg.lagrace.api.repositories.RoomPhotoRepository;
-import mg.lagrace.api.repositories.RoomPhotoViewRepository;
 import mg.lagrace.api.repositories.RoomRepository;
 import mg.lagrace.api.repositories.RoomStatusHistoryRepository;
 import mg.lagrace.api.repositories.RoomStatusRepository;
 import mg.lagrace.api.repositories.RoomTypeRepository;
-import mg.lagrace.api.repositories.UserRepository;
 
 @Service
 public class RoomService {
@@ -43,35 +40,83 @@ public class RoomService {
     private final RoomDetailRepository roomDetailRepository;
     private final RoomStatusRepository roomStatusRepository;
     private final RoomTypeRepository roomTypeRepository;
-    private final RoomPhotoViewRepository roomPhotoViewRepository; 
-    private final RoomPhotoRepository roomPhotoRepository; 
     private final RoomStatusHistoryRepository roomStatusHistoryRepository;
+    private final RoomTypeService roomTypeService;
 
-
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg",
-            "image/png",
-            "image/webp"
-    );
     private final Cloudinary cloudinary;
 
     public RoomService(RoomRepository roomRepository, RoomDetailRepository roomDetailRepository,
             RoomStatusRepository roomStatusRepository, RoomTypeRepository roomTypeRepository,
-            RoomPhotoViewRepository roomPhotoViewRepository, RoomPhotoRepository roomPhotoRepository,
-            Cloudinary cloudinary, RoomStatusHistoryRepository roomStatusHistoryRepository) {
+            Cloudinary cloudinary, RoomStatusHistoryRepository roomStatusHistoryRepository,
+            RoomTypeService roomTypeService) {
         this.roomRepository = roomRepository;
         this.roomDetailRepository = roomDetailRepository;
         this.roomStatusRepository = roomStatusRepository;
         this.roomTypeRepository = roomTypeRepository;
-        this.roomPhotoViewRepository = roomPhotoViewRepository;
-        this.roomPhotoRepository = roomPhotoRepository;
         this.cloudinary = cloudinary;
         this.roomStatusHistoryRepository = roomStatusHistoryRepository;
+        this.roomTypeService = roomTypeService;
     }
 
+    // =======================================
+    // ============== GENERALS ===============
+    // =======================================
     public List<RoomDetail> getRooms() {
         return roomDetailRepository.findAll();
+    }
+
+    public List<Long> getAvailableRoomIds(LocalDate checkIn, LocalDate checkOut) {
+        validateAvailabilityPeriod(checkIn, checkOut);
+        return roomRepository.findAvailableRoomIds(checkIn, checkOut);
+    }
+
+    public List<Long> getAvailableRoomIds(LocalDate checkIn, LocalDate checkOut, Long excludeBookingRoomId) {
+        validateAvailabilityPeriod(checkIn, checkOut);
+
+        return roomRepository.findAvailableRoomIds(checkIn, checkOut, excludeBookingRoomId);
+    }
+
+    private void validateAvailabilityPeriod(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null)
+            throw new ValidationException("Les dates d'arrivée et de départ sont obligatoires.");
+        if (!checkOut.isAfter(checkIn))
+            throw new ValidationException("La date de départ doit être après la date d'arrivée.");
+    }
+
+    @Transactional
+    public List<RoomSearchResponse> searchAvailableRooms(LocalDate checkIn, LocalDate checkOut) {
+        validateSearchPeriod(checkIn, checkOut);
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new ValidationException("La date d'arrivée ne peut pas être dans le passé.");
+        }
+
+        Set<Long> availableIds = Set.copyOf(roomRepository.findAvailableRoomIds(checkIn, checkOut, null));
+        List<RoomDetail> availableRooms = roomDetailRepository.findAll().stream()
+            .filter(room -> room.getIdRoom() != null && availableIds.contains(room.getIdRoom().longValue()))
+            .toList();
+        List<Long> typeIds = availableRooms.stream()
+            .map(RoomDetail::getTypeId)
+            .filter(typeId -> typeId != null)
+            .map(Integer::longValue)
+            .distinct()
+            .toList();
+        Map<Long, ApplicableNightRate> ratesByType = roomTypeService.getApplicableNightRates(typeIds, checkIn);
+
+        return availableRooms.stream()
+            .map(room -> RoomSearchResponse.from(
+                room,
+                room.getTypeId() == null ? null : ratesByType.get(room.getTypeId().longValue()),
+                checkIn))
+            .toList();
+    }
+
+    private void validateSearchPeriod(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null) {
+            throw new ValidationException("Les dates d'arrivée et de départ sont obligatoires.");
+        }
+        if (!checkOut.isAfter(checkIn)) {
+            throw new ValidationException("La date de départ doit être après la date d'arrivée.");
+        }
     }
 
     public RoomDetail NewRoom(RoomRequest room) {
@@ -115,6 +160,7 @@ public class RoomService {
             throw new ValidationException("L'étage doit être supérieur ou égal à zéro.");
         }
     }
+    
     public RoomDetail updateRoomDetail(Long id, RoomRequest room) {
         if (id == null) {
             throw new ValidationException("L'identifiant de la chambre est obligatoire.");
@@ -151,30 +197,6 @@ public class RoomService {
     }
 
     @Transactional
-    public RoomDetail changeRoomStatus(Long roomId, Long statusId) {
-        if (roomId == null || statusId == null) {
-            throw new ValidationException("La chambre et le statut sont obligatoires.");
-        }
-
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chambre introuvable avec l'id " + roomId));
-        RoomStatus status = roomStatusRepository.findById(statusId)
-                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable avec l'id " + statusId));
-
-        if (!statusId.equals(room.getStatus().getIdStatus())) {
-            room.setStatus(status);
-            roomRepository.save(room);
-
-            RoomStatusHistory history = new RoomStatusHistory();
-            history.setRoom(room);
-            history.setStatus(status);
-            roomStatusHistoryRepository.save(history);
-        }
-
-        return roomDetailRepository.findById(roomId).orElse(null);
-    }
-
-    @Transactional
     public void archiveRoom(Long roomId) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chambre introuvable avec l'id " + roomId));
@@ -198,176 +220,9 @@ public class RoomService {
         roomRepository.delete(room);
     }
 
-    public List<RoomPhotoView> getRoomPhotos(Integer roomId) {
-        return roomPhotoViewRepository.findByIdIdRoom(roomId);
-    }
-
-    @Transactional
-    public void deletePhoto(Long photoId) throws IOException {
-        RoomPhoto photo = roomPhotoRepository.findById(photoId)
-                .orElseThrow(() -> new IllegalArgumentException("Photo introuvable"));
-
-        Map<?, ?> result = cloudinary.uploader().destroy(
-                photo.getPublicId(),
-                ObjectUtils.asMap("resource_type", "image", "invalidate", true)
-        );
-        String resultStatus = (String) result.get("result");
-        if (!"ok".equals(resultStatus) && !"not found".equals(resultStatus)) {
-            throw new IllegalStateException("La suppression Cloudinary a échoué : " + resultStatus);
-        }
-
-        roomPhotoRepository.delete(photo);
-    }
-
-    @Transactional
-    public RoomPhoto setCoverPhoto(Long roomId, Long photoId) {
-        RoomPhoto photo = roomPhotoRepository.findById(photoId)
-                .orElseThrow(() -> new IllegalArgumentException("Photo introuvable"));
-        if (photo.getRoom() == null || !roomId.equals(photo.getRoom().getIdRoom())) {
-            throw new IllegalArgumentException("Cette photo n'appartient pas à la chambre");
-        }
-
-        if (Boolean.TRUE.equals(photo.getIsCover())) {
-            photo.setIsCover(false);
-        } else {
-            roomPhotoRepository.findByRoom_IdRoomAndIsCoverTrue(roomId)
-                .ifPresent(current -> current.setIsCover(false));
-            photo.setIsCover(true);
-        }
-        return roomPhotoRepository.save(photo);
-    }
-
-    // ================================
-    // ========     PHOTOS     ========
-    // ================================
-    @Transactional
-    public RoomPhoto uploadForRoom(
-            Long roomId,
-            MultipartFile file,
-            String caption,
-            boolean isCover
-    ) throws IOException {
-
-        validateImage(file);
-
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Chambre introuvable"));
-
-        if (isCover) {
-            roomPhotoRepository.findByRoom_IdRoomAndIsCoverTrue(roomId)
-                    .ifPresent(oldCover -> oldCover.setIsCover(false));
-        }
-
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                file.getBytes(),
-                ObjectUtils.asMap(
-                        "resource_type", "image",
-                        "folder", "hotel/rooms/" + roomId,
-                        "public_id", UUID.randomUUID().toString(),
-                        "overwrite", false,
-                        "quality", "auto",
-                        "fetch_format", "auto"
-                )
-        );
-
-        String secureUrl = (String) uploadResult.get("secure_url");
-        String cloudinaryPublicId = (String) uploadResult.get("public_id");
-
-        if (secureUrl == null || cloudinaryPublicId == null) {
-            throw new IllegalStateException(
-                    "Cloudinary n'a pas retourné les informations de l'image"
-            );
-        }
-
-        RoomPhoto photo = new RoomPhoto();
-        photo.setUrl(secureUrl);
-        photo.setPublicId(cloudinaryPublicId);
-        photo.setCaption(normalizeCaption(caption));
-        photo.setIsCover(isCover);
-        photo.setRoom(room);
-        photo.setType(null);
-
-        return roomPhotoRepository.save(photo);
-    }
-
-    @Transactional
-    public RoomPhoto uploadForRoomType(
-            Long typeId,
-            MultipartFile file,
-            String caption,
-            boolean isCover
-    ) throws IOException {
-
-        validateImage(file);
-
-        RoomType roomType = roomTypeRepository.findById(typeId)
-                .orElseThrow(() -> new IllegalArgumentException("Type de chambre introuvable"));
-
-        if (isCover) {
-            roomPhotoRepository.findByType_IdTypeAndIsCoverTrue(typeId)
-                    .ifPresent(oldCover -> oldCover.setIsCover(false));
-        }
-
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                file.getBytes(),
-                ObjectUtils.asMap(
-                        "resource_type", "image",
-                        "folder", "hotel/room-types/" + typeId,
-                        "public_id", UUID.randomUUID().toString(),
-                        "overwrite", false,
-                        "quality", "auto",
-                        "fetch_format", "auto"
-                )
-        );
-
-        RoomPhoto photo = new RoomPhoto();
-        photo.setUrl((String) uploadResult.get("secure_url"));
-        photo.setPublicId((String) uploadResult.get("public_id"));
-        photo.setCaption(normalizeCaption(caption));
-        photo.setIsCover(isCover);
-        photo.setRoom(null);
-        photo.setType(roomType);
-
-        return roomPhotoRepository.save(photo);
-    }
-
-    private void validateImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Veuillez sélectionner une image");
-        }
-
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException(
-                    "La taille maximale autorisée est de 5 Mo"
-            );
-        }
-
-        String contentType = file.getContentType();
-
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            throw new IllegalArgumentException(
-                    "Formats acceptés : JPEG, PNG et WebP"
-            );
-        }
-    }
-
-    private String normalizeCaption(String caption) {
-        if (caption == null || caption.isBlank()) {
-            return null;
-        }
-
-        String normalized = caption.trim();
-
-        if (normalized.length() > 255) {
-            throw new IllegalArgumentException(
-                    "La légende ne doit pas dépasser 255 caractères"
-            );
-        }
-
-        return normalized;
-    }
-
-    // ========== STATUS & HISTORIQUES ============= //
+    // =======================================
+    // ======== STATUS & HISTORIQUES =========
+    // =======================================
     public List<RoomStatusHistoryResponse> getHistoStatus(Long idRoom, int limit) {
         if(idRoom == null) {
             throw new ValidationException("Identifiant de la chambre non réçu.");
@@ -380,6 +235,30 @@ public class RoomService {
             .stream()
             .map(RoomStatusHistoryResponse::from)
             .toList();
+    }
+
+    @Transactional
+    public RoomDetail changeRoomStatus(Long roomId, Long statusId) {
+        if (roomId == null || statusId == null) {
+            throw new ValidationException("La chambre et le statut sont obligatoires.");
+        }
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chambre introuvable avec l'id " + roomId));
+        RoomStatus status = roomStatusRepository.findById(statusId)
+                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable avec l'id " + statusId));
+
+        if (!statusId.equals(room.getStatus().getIdStatus())) {
+            room.setStatus(status);
+            roomRepository.save(room);
+
+            RoomStatusHistory history = new RoomStatusHistory();
+            history.setRoom(room);
+            history.setStatus(status);
+            roomStatusHistoryRepository.save(history);
+        }
+
+        return roomDetailRepository.findById(roomId).orElse(null);
     }
 
 }

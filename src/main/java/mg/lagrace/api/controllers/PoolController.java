@@ -6,7 +6,6 @@ import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
 import mg.lagrace.api.dto.pool.PoolRateRequest;
 import mg.lagrace.api.dto.pool.PoolRateResponse;
 import mg.lagrace.api.models.Pool;
-import mg.lagrace.api.models.Space;
 import mg.lagrace.api.models.enums.PhotoItemType;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.PoolManagmentService;

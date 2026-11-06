@@ -56,7 +56,7 @@ public class PhotoService {
         validateImage(file);
         ItemResolver resolver = resolverFor(type);
         if (!resolver.exists(itemId)) {
-            throw new IllegalArgumentException(type + " " + itemId + " introuvable");
+            throw new ResourceNotFoundException(type + " " + itemId + " introuvable");
         }
         String cleanCaption = normalize(caption, "La légende");
         String cleanAlt = normalize(altText, "Le texte alternatif");

@@ -1,16 +1,17 @@
 package mg.lagrace.api.services;
 
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import jakarta.validation.ValidationException;
 import mg.lagrace.api.dto.room.RoomCategoryRequest;
 import mg.lagrace.api.dto.room.RoomStatusRequest;
 import mg.lagrace.api.dto.room.RoomTypeRequest;
 import mg.lagrace.api.dto.room.equipment.EquipmentRequest;
 import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
+import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.models.Equipment;
 import mg.lagrace.api.models.RoomCategory;
 import mg.lagrace.api.models.RoomStatus;
@@ -140,7 +141,10 @@ public class RoomConfigService {
     // GESTION TYPE DE CHAMBRE
     // =======================================
     public List<RoomType> getRoomTypes() {
-        return typeRepository.findAll();
+        return typeRepository.findAll()
+                .stream()
+                .sorted(Comparator.comparing(RoomType::getIdType))
+                .toList();
     }
 
     public RoomType addType(RoomTypeRequest request) {

@@ -17,7 +17,6 @@ import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.models.Pool;
 import mg.lagrace.api.models.PoolRate;
 import mg.lagrace.api.models.PoolService;
-import mg.lagrace.api.models.Space;
 import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.PoolRepository;
 import mg.lagrace.api.repositories.PoolRateRepository;

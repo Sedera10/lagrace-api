@@ -1,6 +1,8 @@
 package mg.lagrace.api.repositories;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +13,13 @@ import org.springframework.data.repository.query.Param;
 import mg.lagrace.api.models.RoomRate;
 
 public interface RoomRateRepository extends JpaRepository<RoomRate,Long> {
+  interface ApplicableNightRate {
+    Long getTypeId();
+    Long getRateId();
+    BigDecimal getAmount();
+    String getUnitName();
+  }
+
     List<RoomRate> findByType_IdTypeAndUnit_Service(Long typeId, String service);
     Optional<RoomRate> findByType_IdTypeAndUnit_IdUnitAndValidFrom(Long typeId, Long unitId, LocalDate validFrom);
 
@@ -37,6 +46,26 @@ public interface RoomRateRepository extends JpaRepository<RoomRate,Long> {
         """, nativeQuery = true)
     List<RoomRate> findApplicableByType(@Param("typeId") Long typeId,
                                         @Param("date") LocalDate date);
+
+    @Query(value = """
+        SELECT DISTINCT ON (rr.type_id)
+               rr.type_id AS "typeId",
+               rr.id_rate AS "rateId",
+               rr.amount AS "amount",
+               u.name AS "unitName"
+        FROM room_rate rr
+        JOIN unit u ON u.id_unit = rr.unit_id
+        WHERE rr.type_id IN (:typeIds)
+          AND rr.valid_from <= :date
+          AND (rr.valid_to IS NULL OR rr.valid_to >= :date)
+          AND LOWER(u.service) = 'room'
+          AND LOWER(u.name) = 'nuit'
+        ORDER BY rr.type_id, rr.unit_id,
+                 (rr.valid_to IS NULL), rr.valid_from DESC, rr.id_rate DESC
+        """, nativeQuery = true)
+    List<ApplicableNightRate> findApplicableNightRatesByTypes(
+            @Param("typeIds") Collection<Long> typeIds,
+            @Param("date") LocalDate date);
 
     // ======  VERIFICATION  =========
     // Deux tarifs qui démarrent le même jour (même type + unité)

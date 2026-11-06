@@ -9,16 +9,11 @@ import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
 import mg.lagrace.api.dto.room.equipment.AddRoomTypeEquipmentRequest;
 import mg.lagrace.api.dto.room.equipment.RoomTypeEquipmentResponse;
 import mg.lagrace.api.dto.room.equipment.UpdateRoomTypeEquipmentRequest;
-import mg.lagrace.api.dto.room.photo.RoomPhotoResponse;
-import mg.lagrace.api.dto.room.photo.UpdateRoomPhotoRequest;
 import mg.lagrace.api.dto.room.rate.CreateRoomRateRequest;
 import mg.lagrace.api.dto.room.rate.RoomRateResponse;
-import mg.lagrace.api.dto.room.rate.RoomTypeRateRow;
-import mg.lagrace.api.dto.room.rate.RoomTypeRateRowRequest;
 import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.RoomTypeService;
-import mg.lagrace.api.models.RoomPhoto;
 import mg.lagrace.api.models.RoomTypeEquipment;
 import mg.lagrace.api.models.enums.PhotoItemType;
 
@@ -51,6 +46,10 @@ public class RoomTypeController {
         this.roomTypeService = roomTypeService;
         this.photoService = photoService;
     }
+
+    // ===================================
+    // ============ PHOTOS ===============
+    // ===================================
 
     @GetMapping("/{typeId}/photos")
     public ResponseEntity<ApiResponse<List<PhotoResponse>>> getTypePhotos(
@@ -110,9 +109,9 @@ public class RoomTypeController {
         return ResponseEntity.ok(ApiResponse.success(null, "Photo définie comme couverture."));
     }
     
-
-
-    // ==================== EQUIPEMENTS ================== //
+    // =====================================
+    // =========== EQUIPEMENTS =============
+    // =====================================
     @GetMapping("/{typeId}/equipments")
     public ResponseEntity<ApiResponse<List<RoomTypeEquipmentResponse>>> getEquipments(@PathVariable Long typeId) {
         List<RoomTypeEquipment> equipments = roomTypeService.getEquipmentsByType(typeId);
@@ -162,7 +161,9 @@ public class RoomTypeController {
         return ResponseEntity.ok(ApiResponse.success(null, "Équipement retiré du type"));
     }
 
+    // ===================================
     // ============ TARIFS ===============
+    // ===================================
     @GetMapping("/{typeId}/tarifs")
     public ResponseEntity<ApiResponse<List<RoomRateResponse>>> getRates(@PathVariable Long typeId,@RequestParam(required = false) LocalDate date ) {
         List<RoomRateResponse> tarifs = roomTypeService.listTarifs(typeId, date);

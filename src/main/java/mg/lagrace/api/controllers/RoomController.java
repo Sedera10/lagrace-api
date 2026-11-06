@@ -7,16 +7,15 @@ import mg.lagrace.api.dto.ApiResponse;
 import mg.lagrace.api.dto.photo.PhotoResponse;
 import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
 import mg.lagrace.api.dto.room.RoomRequest;
+import mg.lagrace.api.dto.room.RoomSearchResponse;
 import mg.lagrace.api.dto.room.RoomStatusHistoryResponse;
-import mg.lagrace.api.dto.room.photo.RoomPhotoResponse;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.RoomService;
-import mg.lagrace.api.models.RoomPhoto;
 import mg.lagrace.api.models.enums.PhotoItemType;
 import mg.lagrace.api.models.views.RoomDetail;
-import mg.lagrace.api.models.views.RoomPhotoView;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,15 +50,27 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.success(rooms, "Liste des Chambres"));
     }
 
-        @GetMapping("/{id}/status-history")
-        public ResponseEntity<ApiResponse<List<RoomStatusHistoryResponse>>> getStatusHistory(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "10") int limit
-        ) {
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<List<Long>>> getAvailableRooms(
+            @RequestParam(required = false) LocalDate checkIn,
+            @RequestParam(required = false) LocalDate checkOut,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to,
+            @RequestParam(required = false) Long excludeBookingRoomId
+    ) {
+        LocalDate resolvedFrom = from == null ? checkIn : from;
+        LocalDate resolvedTo = to == null ? checkOut : to;
+        List<Long> availableRoomIds = roomService.getAvailableRoomIds(resolvedFrom, resolvedTo, excludeBookingRoomId);
+        return ResponseEntity.ok(ApiResponse.success(availableRoomIds, "Chambres disponibles."));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<RoomSearchResponse>>> searchAvailableRooms(
+            @RequestParam LocalDate checkIn,
+            @RequestParam LocalDate checkOut) {
         return ResponseEntity.ok(ApiResponse.success(
-            roomService.getHistoStatus(id, limit), "Historique des statuts récupéré."
-        ));
-        }
+                roomService.searchAvailableRooms(checkIn, checkOut), "Chambres disponibles pour cette période."));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<RoomDetail>> AddRoom(@RequestBody RoomRequest request) {
@@ -78,16 +89,31 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Chambre modifiée avec succès."));
     }
 
-        @PatchMapping("/{roomId}/status")
-        public ResponseEntity<ApiResponse<RoomDetail>> changeRoomStatus(
-            @PathVariable Long roomId,
-            @RequestParam("statusId") Long statusId
-        ) {
-        return ResponseEntity.ok(ApiResponse.success(
-            roomService.changeRoomStatus(roomId, statusId),
-            "Statut de la chambre mis à jour."
-        ));
-        }
+    // ================================ 
+    // =========== STATUS =============
+    // ================================ 
+
+    @GetMapping("/{id}/status-history")
+    public ResponseEntity<ApiResponse<List<RoomStatusHistoryResponse>>> getStatusHistory(
+        @PathVariable Long id,
+        @RequestParam(defaultValue = "10") int limit
+    ) {
+    return ResponseEntity.ok(ApiResponse.success(
+        roomService.getHistoStatus(id, limit), "Historique des statuts récupéré."
+    ));
+    }
+
+
+    @PatchMapping("/{roomId}/status")
+    public ResponseEntity<ApiResponse<RoomDetail>> changeRoomStatus(
+        @PathVariable Long roomId,
+        @RequestParam("statusId") Long statusId
+    ) {
+    return ResponseEntity.ok(ApiResponse.success(
+        roomService.changeRoomStatus(roomId, statusId),
+        "Statut de la chambre mis à jour."
+    ));
+    }
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<ApiResponse<Void>> archiveRoom(@PathVariable Long id) {
@@ -100,6 +126,10 @@ public class RoomController {
         roomService.permanentlyDeleteRoom(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Chambre supprimée définitivement."));
     }
+
+    // ================================ 
+    // =========== STATUS =============
+    // ================================ 
 
     @GetMapping("{id}/photos")
     public ResponseEntity<ApiResponse<List<PhotoResponse>>> roomPhotos(@PathVariable Long id) {

@@ -15,6 +15,9 @@ public class PoolService {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "is_exclusive")
+    private Boolean isExculusive;
+
     public Long getIdService() { return idService; }
     public void setIdService(Long idService) { this.idService = idService; }
     public String getCode() { return code; }
@@ -23,4 +26,6 @@ public class PoolService {
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public Boolean getIsExculusive() { return isExculusive; }
+    public void setIsExculusive(Boolean isExculusive) { this.isExculusive = isExculusive; }
 }

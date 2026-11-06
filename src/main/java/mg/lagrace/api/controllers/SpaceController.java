@@ -6,12 +6,9 @@ import mg.lagrace.api.dto.space.SpaceRateResponse;
 import mg.lagrace.api.dto.space.SpaceRequest;
 import mg.lagrace.api.dto.photo.PhotoResponse;
 import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
-import mg.lagrace.api.dto.user.UserResponse;
 import mg.lagrace.api.models.AdditionalService;
 import mg.lagrace.api.models.Space;
-import mg.lagrace.api.models.views.RoomDetail;
 import mg.lagrace.api.services.SpaceService;
-import mg.lagrace.api.services.UserService;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.models.enums.PhotoItemType;
 

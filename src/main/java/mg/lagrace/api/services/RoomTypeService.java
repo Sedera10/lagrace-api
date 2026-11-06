@@ -1,15 +1,13 @@
 package mg.lagrace.api.services;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -22,8 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import mg.lagrace.api.dto.room.rate.CreateRoomRateRequest;
 import mg.lagrace.api.dto.room.rate.RoomRateResponse;
-import mg.lagrace.api.dto.room.rate.RoomTypeRateRow;
-import mg.lagrace.api.dto.room.rate.RoomTypeRateRowRequest;
 import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.models.Equipment;
 import mg.lagrace.api.models.RoomPhoto;
@@ -32,6 +28,7 @@ import mg.lagrace.api.models.RoomType;
 import mg.lagrace.api.models.RoomTypeEquipment;
 import mg.lagrace.api.models.RoomTypeEquipmentId;
 import mg.lagrace.api.models.Unit;
+import mg.lagrace.api.repositories.RoomRateRepository.ApplicableNightRate;
 import mg.lagrace.api.repositories.EquipmentRepository;
 import mg.lagrace.api.repositories.RoomPhotoRepository;
 import mg.lagrace.api.repositories.RoomRateRepository;
@@ -49,9 +46,6 @@ public class RoomTypeService {
     private final UnitRepository unitRepository;
 
     private static final String ROOM_SERVICE = "ROOM";
-    private static final String NIGHT_UNIT_NAME = "Nuit";
-    private static final String DAY_UNIT_NAME = "Jour";
-    private static final String HOUR_UNIT_NAME = "Heure";
 
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -60,8 +54,6 @@ public class RoomTypeService {
             "image/webp"
     );
     private final Cloudinary cloudinary;
-
-    private record PeriodKey(LocalDate validFrom, LocalDate validTo) {}
 
     public RoomTypeService(RoomTypeRepository roomTypeRepository,
         RoomPhotoRepository roomPhotoRepository, Cloudinary cloudinary,
@@ -269,152 +261,9 @@ public class RoomTypeService {
         roomTypeEquipmentRepository.deleteByType_IdTypeAndEquipment_IdEquipment(typeId, equipmentId);
     }
 
-    // ============ TARIFS =============//
-    public List<RoomTypeRateRow> getRateRowsByType(Long typeId) {
-        roomTypeRepository.findById(typeId)
-            .orElseThrow(() -> new IllegalArgumentException("Type introuvable"));
-
-        List<RoomRate> rates = roomRateRepository.findByType_IdTypeAndUnit_Service(typeId, ROOM_SERVICE);
-        Map<PeriodKey, Map<Long, BigDecimal>> grouped = new HashMap<>();
-
-        for (RoomRate rate : rates) {
-            PeriodKey key = new PeriodKey(rate.getValidFrom(), rate.getValidTo());
-            grouped.computeIfAbsent(key, ignored -> new HashMap<>())
-                .put(rate.getUnit().getIdUnit(), rate.getAmount());
-        }
-
-        Long nightUnitId = getUnitIdByName(NIGHT_UNIT_NAME);
-        Long dayUnitId = getUnitIdByName(DAY_UNIT_NAME);
-        Long hourUnitId = getUnitIdByName(HOUR_UNIT_NAME);
-
-        return grouped.entrySet().stream()
-            .map(entry -> {
-                LocalDate validFrom = entry.getKey().validFrom();
-                LocalDate validTo = entry.getKey().validTo();
-                Map<Long, BigDecimal> values = entry.getValue();
-
-                return new RoomTypeRateRow(
-                    validFrom,
-                    validTo,
-                    values.get(nightUnitId),
-                    values.get(dayUnitId),
-                    values.get(hourUnitId)
-                );
-            })
-            .sorted(Comparator.comparing(RoomTypeRateRow::validFrom))
-            .toList();
-    }
-
-    @Transactional
-    public RoomRate upsertRateForType(Long typeId, Long unitId, LocalDate validFrom, LocalDate validTo, BigDecimal amount) {
-        if (typeId == null) {
-            throw new IllegalArgumentException("Le type est requis");
-        }
-        if (unitId == null) {
-            throw new IllegalArgumentException("L'unité est requise");
-        }
-        if (validFrom == null) {
-            throw new IllegalArgumentException("La date de début est requise");
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Le montant doit être positif ou nul");
-        }
-        if (validTo != null && validFrom.isAfter(validTo)) {
-            throw new IllegalArgumentException("La date de fin doit être après la date de début");
-        }
-
-        RoomType roomType = roomTypeRepository.findById(typeId)
-            .orElseThrow(() -> new IllegalArgumentException("Type introuvable"));
-
-        Unit unit = unitRepository.findById(unitId)
-            .orElseThrow(() -> new IllegalArgumentException("Unité introuvable"));
-
-        if (!ROOM_SERVICE.equalsIgnoreCase(unit.getService())) {
-            throw new IllegalArgumentException("Cette unité ne concerne pas les chambres");
-        }
-
-        RoomRate rate = roomRateRepository
-            .findByType_IdTypeAndUnit_IdUnitAndValidFrom(typeId, unitId, validFrom)
-            .orElseGet(() -> {
-                RoomRate newRate = new RoomRate();
-                newRate.setType(roomType);
-                newRate.setUnit(unit);
-                newRate.setValidFrom(validFrom);
-                return newRate;
-            });
-
-        rate.setValidTo(validTo);
-        rate.setAmount(amount);
-
-        return roomRateRepository.save(rate);
-    }
-
-    @Transactional
-    public RoomTypeRateRow upsertRateRowForType(Long typeId, RoomTypeRateRowRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("Les données du tarif sont requises");
-        }
-
-        Long nightUnitId = getUnitIdByName(NIGHT_UNIT_NAME);
-        Long dayUnitId = getUnitIdByName(DAY_UNIT_NAME);
-        Long hourUnitId = getUnitIdByName(HOUR_UNIT_NAME);
-
-        if (request.previousValidFrom() != null && !request.previousValidFrom().equals(request.validFrom())) {
-            moveRatePeriod(typeId, nightUnitId, request, request.nightAmount());
-            moveRatePeriod(typeId, dayUnitId, request, request.dayAmount());
-            moveRatePeriod(typeId, hourUnitId, request, request.hourAmount());
-        } else {
-            upsertRateForType(typeId, nightUnitId, request.validFrom(), request.validTo(), request.nightAmount());
-            upsertRateForType(typeId, dayUnitId, request.validFrom(), request.validTo(), request.dayAmount());
-            upsertRateForType(typeId, hourUnitId, request.validFrom(), request.validTo(), request.hourAmount());
-        }
-
-        return new RoomTypeRateRow(
-            request.validFrom(),
-            request.validTo(),
-            request.nightAmount(),
-            request.dayAmount(),
-            request.hourAmount()
-        );
-    }
-
-    @Transactional
-    public void deleteRateRowForType(Long typeId, LocalDate validFrom, LocalDate validTo) {
-        if (validFrom == null) {
-            throw new IllegalArgumentException("La date de début est requise");
-        }
-
-        List<RoomRate> rates = roomRateRepository.findByType_IdTypeAndUnit_Service(typeId, ROOM_SERVICE).stream()
-            .filter(rate -> validFrom.equals(rate.getValidFrom()) && Objects.equals(validTo, rate.getValidTo()))
-            .toList();
-
-        if (rates.isEmpty()) {
-            throw new IllegalArgumentException("Période tarifaire introuvable");
-        }
-
-        roomRateRepository.deleteAll(rates);
-    }
-
-    private void moveRatePeriod(Long typeId, Long unitId, RoomTypeRateRowRequest request, BigDecimal amount) {
-        RoomRate rate = roomRateRepository
-            .findByType_IdTypeAndUnit_IdUnitAndValidFrom(typeId, unitId, request.previousValidFrom())
-            .orElseThrow(() -> new IllegalArgumentException("Tarif d'origine introuvable"));
-
-        rate.setValidFrom(request.validFrom());
-        rate.setValidTo(request.validTo());
-        rate.setAmount(amount);
-        roomRateRepository.save(rate);
-    }
-
-    private Long getUnitIdByName(String unitName) {
-        return unitRepository.findByService(ROOM_SERVICE).stream()
-            .filter(unit -> unitName.equalsIgnoreCase(unit.getName()))
-            .map(Unit::getIdUnit)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Unité chambre introuvable : " + unitName));
-    }
-
-    // =========== TARIFS 2 =========== //
+    // ===================================
+    // ============ TARIFS ===============
+    // =================================== 
     @Transactional(readOnly = true)
     public List<RoomRateResponse> listTarifs(Long typeId, LocalDate date) {
         if (!roomTypeRepository.existsById(typeId)) {
@@ -434,6 +283,22 @@ public class RoomTypeService {
                         applicableIds.contains(r.getIdRate())))
                 .toList();
     }
+
+    @Transactional(readOnly = true)
+    public Map<Long, ApplicableNightRate> getApplicableNightRates(Collection<Long> typeIds, LocalDate date) {
+        if (typeIds == null || typeIds.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        return roomRateRepository.findApplicableNightRatesByTypes(typeIds, effectiveDate).stream()
+                .collect(Collectors.toMap(ApplicableNightRate::getTypeId, Function.identity()));
+    }
+
+    @Transactional(readOnly = true)
+    public ApplicableNightRate getApplicableNightRate(Long typeId, LocalDate date) {
+        return getApplicableNightRates(List.of(typeId), date).get(typeId);
+    }
+
     @Transactional
     public RoomRateResponse createRate(Long typeId, CreateRoomRateRequest req) {
         RoomType type = roomTypeRepository.findById(typeId)
