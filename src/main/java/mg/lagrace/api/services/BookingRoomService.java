@@ -1,8 +1,8 @@
 package mg.lagrace.api.services;
 
 import java.time.LocalDate;
-import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,6 +30,7 @@ import mg.lagrace.api.dto.booking.room.BookingRoomUpdateRequest;
 import mg.lagrace.api.dto.booking.room.BookingRoomExtendRequest;
 import mg.lagrace.api.dto.booking.room.BookingRoomCheckInRequest;
 import mg.lagrace.api.dto.booking.room.BookingRoomCheckOutRequest;
+import mg.lagrace.api.catalog.room.Room;
 import mg.lagrace.api.dto.booking.BookingDetailResponse;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.exceptions.ValidationException;
@@ -50,7 +51,6 @@ import mg.lagrace.api.models.Nationality;
 import mg.lagrace.api.models.Payment;
 import mg.lagrace.api.models.PaymentKind;
 import mg.lagrace.api.models.PaymentMethod;
-import mg.lagrace.api.models.Room;
 import mg.lagrace.api.models.User;
 import mg.lagrace.api.models.views.BookingBalance;
 import mg.lagrace.api.models.views.BookingLineView;
@@ -276,13 +276,13 @@ public class BookingRoomService {
             addedLine = bookingRoomRepo.saveAndFlush(addedLine);
             saveHistory(booking, "ROOM", addedLine.getIdBookingRoom(), confirmed.getCode(), user);
             UUID operationId = UUID.randomUUID();
-            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "EXTEND", "room_id", null,
+            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "UPDATE", "room_id", null,
                     otherRoom.getIdRoom(), request.reason(), user.getIdUser(), operationId);
-            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "EXTEND", "check_in", null,
+            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "UPDATE", "check_in", null,
                     oldCheckOut, request.reason(), user.getIdUser(), operationId);
-            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "EXTEND", "check_out", null,
+            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "UPDATE", "check_out", null,
                     newCheckOut, request.reason(), user.getIdUser(), operationId);
-            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "EXTEND", "unit_price", null,
+            changeLogger.log(booking.getIdBooking(), "ROOM", addedLine.getIdBookingRoom(), "UPDATE", "unit_price", null,
                     otherPrice, request.reason(), user.getIdUser(), operationId);
             adjustment = otherPrice.multiply(BigDecimal.valueOf(changedNights));
         } else {
@@ -296,9 +296,9 @@ public class BookingRoomService {
         line.setCheckOut(newCheckOut);
         bookingRoomRepo.saveAndFlush(line);
         UUID operationId = UUID.randomUUID();
-        changeLogger.log(booking.getIdBooking(), "ROOM", line.getIdBookingRoom(), "EXTEND", "check_out", oldCheckOut,
+        changeLogger.log(booking.getIdBooking(), "ROOM", line.getIdBookingRoom(), "UPDATE", "check_out", oldCheckOut,
                 newCheckOut, request.reason(), user.getIdUser(), operationId);
-        changeLogger.log(booking.getIdBooking(), "ROOM", line.getIdBookingRoom(), "EXTEND", "reason", null,
+        changeLogger.log(booking.getIdBooking(), "ROOM", line.getIdBookingRoom(), "UPDATE", "reason", null,
                 request.reason(), request.reason(), user.getIdUser(), operationId);
         return finishExtension(booking, adjustment, request.expectedNewTotal());
     }
@@ -327,17 +327,18 @@ public class BookingRoomService {
         if (!"CONFIRMED".equals(line.getStatus() == null ? null : line.getStatus().getCode()))
             throw new ConflictException("FORBIDDEN_TRANSITION", "Seule une ligne CONFIRMED peut être enregistrée à l'arrivée.");
 
-        LocalDate today = LocalDate.now(clock);
-        if (line.getCheckIn() != null && today.isBefore(line.getCheckIn()) && !isAdministrator(authentication))
+        OffsetDateTime checkInAt = request == null ? null : request.checkInAt();
+        if (checkInAt == null) throw new ValidationException("La date et l'heure d'arrivée sont obligatoires.");
+        if (line.getCheckIn() != null && checkInAt.toLocalDate().isBefore(line.getCheckIn()) && !isAdministrator(authentication))
             throw new ConflictException("FORBIDDEN", "Une arrivée anticipée nécessite le rôle Administrateur.");
         if (Boolean.TRUE.equals(bookingRoomRepo.existsOtherCheckIn(line.getRoom().getIdRoom(), id)))
             throw new ConflictException("FORBIDDEN_TRANSITION", "Une autre ligne est déjà enregistrée à l'arrivée dans cette chambre.");
 
         User user = currentUser(authentication);
         String reason = request == null ? null : request.reason();
-        bookingStatusService.changeLineStatus(line, "CHECK_IN", reason, user.getIdUser());
+        bookingStatusService.changeLineStatus(line, "CHECK_IN", reason, user.getIdUser(), checkInAt);
         if (Set.of("PENDING", "CONFIRMED").contains(bookingStatus))
-            bookingStatusService.changeBookingStatus(booking, "IN_PROGRESS", reason, user.getIdUser());
+            bookingStatusService.changeBookingStatus(booking, "IN_PROGRESS", reason, user.getIdUser(), checkInAt);
         return bookingDetailService.get(booking.getIdBooking());
     }
 
@@ -354,21 +355,25 @@ public class BookingRoomService {
             throw new ConflictException("FORBIDDEN_TRANSITION", "Seule une ligne CHECK_IN peut être enregistrée au départ.");
 
         String reason = request == null ? null : request.reason();
+        OffsetDateTime checkOutAt = request == null ? null : request.checkOutAt();
+        if (checkOutAt == null) throw new ValidationException("La date et l'heure de départ sont obligatoires.");
+        LocalDate departureDate = checkOutAt.toLocalDate();
+        if (line.getCheckIn() != null && departureDate.isBefore(line.getCheckIn()))
+            throw new ValidationException("Le départ ne peut pas précéder la date d'arrivée.");
         boolean adjustDeparture = request != null && Boolean.TRUE.equals(request.adjustDeparture());
-        LocalDate today = LocalDate.now(clock);
-        if (adjustDeparture && line.getCheckOut() != null && line.getCheckOut().isAfter(today)) {
+        if (adjustDeparture && line.getCheckOut() != null && line.getCheckOut().isAfter(departureDate)) {
             if (!isAdministrator(authentication))
                 throw new ConflictException("FORBIDDEN", "L'ajustement du départ nécessite le rôle Administrateur.");
-            if (line.getCheckIn() == null || !today.isAfter(line.getCheckIn()))
+            if (line.getCheckIn() == null || !departureDate.isAfter(line.getCheckIn()))
                 throw new ValidationException("Le départ doit laisser au moins une nuit.");
             UUID operationId = UUID.randomUUID();
-            changeLogger.log(booking.getIdBooking(), "ROOM", id, "CHECK_OUT", "check_out", line.getCheckOut(), today,
+            changeLogger.log(booking.getIdBooking(), "ROOM", id, "CHECK_OUT", "check_out", line.getCheckOut(), departureDate,
                     reason, currentUser(authentication).getIdUser(), operationId);
-            line.setCheckOut(today);
+            line.setCheckOut(departureDate);
             bookingRoomRepo.saveAndFlush(line);
         }
         User user = currentUser(authentication);
-        bookingStatusService.changeLineStatus(line, "CHECK_OUT", reason, user.getIdUser());
+        bookingStatusService.changeLineStatus(line, "CHECK_OUT", reason, user.getIdUser(), checkOutAt);
         return bookingDetailService.get(booking.getIdBooking());
     }
 
@@ -511,8 +516,8 @@ public class BookingRoomService {
             bookingBalance.getDepositDue(), bookingBalance.getDepositHeld());
     }
 
-        @Transactional(readOnly = true)
-        public Page<BookingResponse> listBookings(Long customerId, int page, int size) {
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> listBookings(Long customerId, int page, int size) {
         Pageable pageable = PageRequest.of(
             Math.max(page, 0),
             Math.max(1, Math.min(size, 100)),
@@ -537,9 +542,9 @@ public class BookingRoomService {
             booking,
             requireBalance(booking.getIdBooking(), balances),
             linesByBookingId.getOrDefault(booking.getIdBooking(), List.of())));
-        }
+    }
 
-        @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
         public BookingResponse getBooking(Long bookingId) {
         if (bookingId == null) {
             throw new ValidationException("L'identifiant de la réservation est obligatoire.");
@@ -554,42 +559,69 @@ public class BookingRoomService {
             .map(BookingLineResponse::from)
             .toList();
         return toBookingResponse(booking, balance, lines);
-        }
+    }
 
-        BookingBalance requireBalance(Long bookingId, Map<Long, BookingBalance> balances) {
+    BookingBalance requireBalance(Long bookingId, Map<Long, BookingBalance> balances) {
         BookingBalance balance = balances.get(bookingId);
         if (balance == null) {
             throw new IllegalStateException(
                 "La vue v_booking_balance n'a retourné aucun résultat pour la réservation " + bookingId);
         }
         return balance;
-        }
+    }
 
-        BookingResponse toBookingResponse(Booking booking, BookingBalance balance,
-            List<BookingLineResponse> lines) {
-        return new BookingResponse(
-            booking.getIdBooking(),
-            booking.getRef(),
-            booking.getCustomer().getIdCustomer(),
-            booking.getCustomer().getFirstName(),
-            booking.getCustomer().getLastName(),
-            booking.getCustomer().getPhone(),
-            booking.getStatus().getCode(),
-            booking.getStatus().getName(),
-            booking.getStatus().getColorCode(),
-            booking.getOrigin(),
-            booking.getNotes(),
-            booking.getCreatedAt(),
-            booking.getUpdatedAt(),
-            balance.getLinesTotal(),
-            balance.getChargesTotal(),
-            balance.getTotal().add(balance.getDepositDue()),
-            balance.getPaid(),
-            balance.getBalance().add(balance.getDepositDue()),
-            balance.getDepositDue(),
-            balance.getDepositHeld(),
-            lines);
-        }
+    BookingResponse toBookingResponse(Booking booking, BookingBalance balance,
+        List<BookingLineResponse> lines) {
+    List<BookingLineResponse> responseLines = markMainLine(lines);
+    return new BookingResponse(
+        booking.getIdBooking(),
+        booking.getRef(),
+        booking.getCustomer().getIdCustomer(),
+        booking.getCustomer().getFirstName(),
+        booking.getCustomer().getLastName(),
+        booking.getCustomer().getPhone(),
+        booking.getStatus().getCode(),
+        booking.getStatus().getName(),
+        booking.getStatus().getColorCode(),
+        booking.getOrigin(),
+        booking.getNotes(),
+        booking.getCreatedAt(),
+        booking.getUpdatedAt(),
+        balance.getLinesTotal(),
+        balance.getChargesTotal(),
+        balance.getTotal().add(balance.getDepositDue()),
+        balance.getPaid(),
+        balance.getBalance().add(balance.getDepositDue()),
+        balance.getDepositDue(),
+        balance.getDepositHeld(),
+        responseLines);
+    }
+
+    private List<BookingLineResponse> markMainLine(List<BookingLineResponse> lines) {
+        if (lines.isEmpty()) return lines;
+        int priority = lines.stream().mapToInt(line -> switch (line.lineType()) {
+            case "SPACE" -> 0;
+            case "MEETING_ROOM" -> 1;
+            case "ROOM" -> 2;
+            default -> 3;
+        }).min().orElse(3);
+        int selectedPriority = priority;
+        BookingLineResponse main = lines.stream()
+                .filter(line -> switch (line.lineType()) {
+                    case "SPACE" -> selectedPriority == 0;
+                    case "MEETING_ROOM" -> selectedPriority == 1;
+                    case "ROOM" -> selectedPriority == 2;
+                    default -> selectedPriority == 3;
+                })
+                .min(java.util.Comparator.comparing(BookingLineResponse::startsAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                        .thenComparing(BookingLineResponse::lineId))
+                .orElseThrow();
+        return lines.stream().map(line -> new BookingLineResponse(line.lineType(), line.lineId(),
+                line.reference(), line.resourceId(), line.startsAt(), line.endsAt(), line.quantity(),
+                line.unitPrice(), line.included(), line.amount(), line.statusId(), line.statusCode(),
+                line.active(), line == main)).toList();
+    }
 
     private void validateRequest(BookingRoomRequest req) {
         if (req == null) throw new ValidationException("Les données de réservation sont obligatoires.");

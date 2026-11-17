@@ -5,59 +5,24 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import mg.lagrace.api.dto.reservation.CodeNameRequest;
-import mg.lagrace.api.dto.reservation.ReservationStatusRequest;
 import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.models.InvoiceStatus;
 import mg.lagrace.api.models.PaymentMethod;
-import mg.lagrace.api.models.ReservationStatus;
 import mg.lagrace.api.repositories.InvoiceStatusRepository;
 import mg.lagrace.api.repositories.PaymentMethodRepository;
-import mg.lagrace.api.repositories.ReservationStatusRepository;
 
 @Service
 public class ReservationConfigService {
-    private final ReservationStatusRepository reservationStatuses;
     private final PaymentMethodRepository paymentMethods;
     private final InvoiceStatusRepository invoiceStatuses;
 
-    public ReservationConfigService(ReservationStatusRepository reservationStatuses,
-            PaymentMethodRepository paymentMethods, InvoiceStatusRepository invoiceStatuses) {
-        this.reservationStatuses = reservationStatuses;
+    public ReservationConfigService(PaymentMethodRepository paymentMethods,
+            InvoiceStatusRepository invoiceStatuses) {
         this.paymentMethods = paymentMethods;
         this.invoiceStatuses = invoiceStatuses;
     }
-
-    public List<ReservationStatus> getReservationStatuses() { return reservationStatuses.findAll(); }
-
-    public ReservationStatus addReservationStatus(ReservationStatusRequest request) {
-        String code = code(request == null ? null : request.code(), "du statut");
-        String name = name(request == null ? null : request.name(), "du statut");
-        if (reservationStatuses.existsByCode(code) || reservationStatuses.existsByName(name)) {
-            throw new DuplicateResourceException("Le statut de réservation existe déjà.");
-        }
-        ReservationStatus status = new ReservationStatus();
-        status.setCode(code);
-        status.setName(name);
-        status.setColorCode(request.colorCode());
-        return reservationStatuses.save(status);
-    }
-
-    public ReservationStatus updateReservationStatus(Long id, ReservationStatusRequest request) {
-        ReservationStatus status = reservationStatuses.findById(id)
-                .orElseThrow(() -> notFound("Statut de réservation", id));
-        String code = code(request == null ? null : request.code(), "du statut");
-        String name = name(request == null ? null : request.name(), "du statut");
-        if ((!status.getCode().equals(code) && reservationStatuses.existsByCode(code))
-                || (!status.getName().equals(name) && reservationStatuses.existsByName(name))) {
-            throw new DuplicateResourceException("Le statut de réservation existe déjà.");
-        }
-        status.setCode(code); status.setName(name); status.setColorCode(request.colorCode());
-        return reservationStatuses.save(status);
-    }
-
-    public void deleteReservationStatus(Long id) { reservationStatuses.delete(find(reservationStatuses, id, "Statut de réservation")); }
 
     public List<PaymentMethod> getPaymentMethods() { return paymentMethods.findAll(); }
     public PaymentMethod addPaymentMethod(CodeNameRequest request) {

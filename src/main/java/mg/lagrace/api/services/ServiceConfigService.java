@@ -6,18 +6,22 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import mg.lagrace.api.dto.service.AdditionalServiceRequest;
+import mg.lagrace.api.dto.service.MenuCategoryRequest;
 import mg.lagrace.api.dto.service.ServiceRequest;
 import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.models.AdditionalService;
 import mg.lagrace.api.models.MeetingRoomService;
+import mg.lagrace.api.models.MenuCategory;
 import mg.lagrace.api.models.PoolService;
 import mg.lagrace.api.models.ServiceScope;
 import mg.lagrace.api.models.SpaceEvent;
 import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.AdditionalServiceRepository;
 import mg.lagrace.api.repositories.MeetingRoomServiceRepository;
+import mg.lagrace.api.repositories.MenuCategoryRepository;
+import mg.lagrace.api.repositories.MenuItemRepository;
 import mg.lagrace.api.repositories.PoolServiceRepository;
 import mg.lagrace.api.repositories.ServiceScopeRepository;
 import mg.lagrace.api.repositories.SpaceEventRepository;
@@ -31,12 +35,16 @@ public class ServiceConfigService {
     private final AdditionalServiceRepository additionalServices;
     private final UnitRepository units;
     private final ServiceScopeRepository scopes;
+    private final MenuCategoryRepository menuCategories;
+    private final MenuItemRepository menuItems;
 
     public ServiceConfigService(SpaceEventRepository events, MeetingRoomServiceRepository meetingServices,
             PoolServiceRepository poolServices, AdditionalServiceRepository additionalServices,
-            UnitRepository units, ServiceScopeRepository scopes) {
+            UnitRepository units, ServiceScopeRepository scopes, MenuCategoryRepository menuCategories,
+            MenuItemRepository menuItems) {
         this.events = events; this.meetingServices = meetingServices; this.poolServices = poolServices;
         this.additionalServices = additionalServices; this.units = units; this.scopes = scopes;
+        this.menuCategories = menuCategories; this.menuItems = menuItems;
     }
 
     public List<SpaceEvent> getSpaceEvents() { return events.findAll(); }
@@ -65,12 +73,51 @@ public class ServiceConfigService {
     public void deleteUnit(Long id) { units.delete(units.findById(id).orElseThrow(() -> missing("Unité", id))); }
 
     public List<AdditionalService> getAdditionalServices() { return additionalServices.findAll(); }
-    public AdditionalService addAdditionalService(AdditionalServiceRequest r) { validateAdditional(r); if (additionalServices.existsByName(r.name().trim())) duplicate(); return additionalServices.save(apply(new AdditionalService(), r)); }
-    public AdditionalService updateAdditionalService(Long id, AdditionalServiceRequest r) { validateAdditional(r); AdditionalService s = additionalServices.findById(id).orElseThrow(() -> missing("Service additionnel", id)); if (!s.getName().equals(r.name().trim()) && additionalServices.existsByName(r.name().trim())) duplicate(); return additionalServices.save(apply(s, r)); }
+    public AdditionalService addAdditionalService(AdditionalServiceRequest r) { validateAdditional(r); if (additionalServices.existsByName(r.name().trim())) duplicate(); validateSpaceDeposit(r, null); return additionalServices.save(apply(new AdditionalService(), r)); }
+    public AdditionalService updateAdditionalService(Long id, AdditionalServiceRequest r) { validateAdditional(r); AdditionalService s = additionalServices.findById(id).orElseThrow(() -> missing("Service additionnel", id)); if (!s.getName().equals(r.name().trim()) && additionalServices.existsByName(r.name().trim())) duplicate(); validateSpaceDeposit(r, id); return additionalServices.save(apply(s, r)); }
     public void deleteAdditionalService(Long id) { additionalServices.delete(additionalServices.findById(id).orElseThrow(() -> missing("Service additionnel", id))); }
 
-    private AdditionalService apply(AdditionalService s, AdditionalServiceRequest r) { s.setName(r.name().trim()); s.setScope(scopes.findById(r.scopeId()).orElseThrow(() -> missing("Périmètre", r.scopeId()))); s.setUnit(units.findById(r.unitId()).orElseThrow(() -> missing("Unité", r.unitId()))); s.setPrice(r.price()); s.setDeposit(Boolean.TRUE.equals(r.deposit())); s.setCateringCondition(r.cateringCondition()); s.setActive(r.active() == null || r.active()); return s; }
+    public List<MenuCategory> getMenuCategories() { return menuCategories.findAllByOrderByPositionAscNameAsc(); }
+    public MenuCategory getMenuCategory(Long id) { return menuCategories.findById(id).orElseThrow(() -> missing("Catégorie de menu", id)); }
+    public MenuCategory addMenuCategory(MenuCategoryRequest request) {
+        validateMenuCategory(request);
+        String name = request.name().trim();
+        if (menuCategories.existsByName(name)) duplicate();
+        MenuCategory category = new MenuCategory();
+        apply(category, request, name);
+        return menuCategories.save(category);
+    }
+    public MenuCategory updateMenuCategory(Long id, MenuCategoryRequest request) {
+        validateMenuCategory(request);
+        MenuCategory category = menuCategories.findById(id).orElseThrow(() -> missing("Catégorie de menu", id));
+        String name = request.name().trim();
+        if (!category.getName().equals(name) && menuCategories.existsByName(name)) duplicate();
+        apply(category, request, name);
+        return menuCategories.save(category);
+    }
+    public void deleteMenuCategory(Long id) {
+        MenuCategory category = menuCategories.findById(id).orElseThrow(() -> missing("Catégorie de menu", id));
+        if (menuItems.existsByCategory_IdMenuCategory(id)) {
+            throw new ValidationException("Cette catégorie contient des menu items et ne peut pas être supprimée.");
+        }
+        menuCategories.delete(category);
+    }
+
+    private AdditionalService apply(AdditionalService s, AdditionalServiceRequest r) { s.setName(r.name().trim()); s.setScope(scopes.findById(r.scopeId()).orElseThrow(() -> missing("Périmètre", r.scopeId()))); s.setUnit(units.findById(r.unitId()).orElseThrow(() -> missing("Unité", r.unitId()))); s.setPrice(r.price()); s.setDeposit(Boolean.TRUE.equals(r.deposit())); s.setCateringCondition(r.cateringCondition()); s.setFreeWithCaterer(Boolean.TRUE.equals(r.freeWithCaterer())); s.setActive(r.active() == null || r.active()); return s; }
+    private void validateMenuCategory(MenuCategoryRequest request) { if (request == null) throw new ValidationException("Les données de la catégorie sont obligatoires."); clean(request.name(), "de la catégorie"); if (request.position() != null && request.position() < 0) throw new ValidationException("La position doit être positive ou nulle."); }
+    private void apply(MenuCategory category, MenuCategoryRequest request, String name) { category.setName(name); category.setPosition(request.position() == null ? 0 : request.position()); }
     private void validateAdditional(AdditionalServiceRequest r) { if (r == null) throw new ValidationException("Les données du service sont obligatoires."); clean(r.name(), "du service"); if (r.scopeId() == null || r.unitId() == null) throw new ValidationException("Le périmètre et l'unité sont obligatoires."); if (r.price() == null || r.price().compareTo(BigDecimal.ZERO) < 0) throw new ValidationException("Le prix doit être positif ou nul."); }
+    private void validateSpaceDeposit(AdditionalServiceRequest request, Long excludedId) {
+        ServiceScope scope = scopes.findById(request.scopeId()).orElseThrow(() -> missing("Périmètre", request.scopeId()));
+        if (!"SPACE".equalsIgnoreCase(scope.getCode()) || !Boolean.TRUE.equals(request.deposit())
+            || Boolean.FALSE.equals(request.active())) return;
+        if (request.price().compareTo(new BigDecimal("100000")) != 0)
+            throw new ValidationException("La caution d'espace doit rester fixée à 100 000 Ar.");
+        boolean anotherActiveDeposit = additionalServices.findActiveSpaceDeposits().stream()
+                .anyMatch(existing -> !existing.getIdService().equals(excludedId));
+        if (anotherActiveDeposit)
+            throw new ValidationException("Un seul service de caution actif est autorisé pour les espaces.");
+    }
     private void validateService(ServiceRequest r) { if (r == null) throw new ValidationException("Les données du service sont obligatoires."); clean(r.code(), "du code"); clean(r.name(), "du service"); }
     private void apply(MeetingRoomService s, ServiceRequest r) { s.setCode(r.code().trim().toUpperCase()); s.setName(r.name().trim()); s.setDescription(r.description()); }
     private void apply(PoolService s, ServiceRequest r) { s.setCode(r.code().trim().toUpperCase()); s.setName(r.name().trim()); s.setDescription(r.description()); }

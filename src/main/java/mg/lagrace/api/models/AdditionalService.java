@@ -27,6 +27,8 @@ public class AdditionalService {
     @Enumerated(EnumType.STRING)
     @Column(name = "catering_condition", length = 20)
     private CateringCondition cateringCondition;
+    @Column(name = "free_with_caterer", nullable = false)
+    private boolean freeWithCaterer;
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -48,6 +50,8 @@ public class AdditionalService {
     public boolean isDeposit() { return deposit; }
     public CateringCondition getCateringCondition () { return cateringCondition; }
     public void setCateringCondition(CateringCondition withCatering) { this.cateringCondition = withCatering; }
+    public boolean isFreeWithCaterer() { return freeWithCaterer; }
+    public void setFreeWithCaterer(boolean freeWithCaterer) { this.freeWithCaterer = freeWithCaterer; }
     public void setDeposit(boolean deposit) { this.deposit = deposit; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }

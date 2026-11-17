@@ -18,15 +18,15 @@ import com.cloudinary.utils.ObjectUtils;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import mg.lagrace.api.catalog.room.RoomPhoto;
+import mg.lagrace.api.catalog.room.RoomRate;
+import mg.lagrace.api.catalog.room.RoomType;
+import mg.lagrace.api.catalog.room.RoomTypeEquipment;
+import mg.lagrace.api.catalog.room.RoomTypeEquipmentId;
 import mg.lagrace.api.dto.room.rate.CreateRoomRateRequest;
 import mg.lagrace.api.dto.room.rate.RoomRateResponse;
 import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.models.Equipment;
-import mg.lagrace.api.models.RoomPhoto;
-import mg.lagrace.api.models.RoomRate;
-import mg.lagrace.api.models.RoomType;
-import mg.lagrace.api.models.RoomTypeEquipment;
-import mg.lagrace.api.models.RoomTypeEquipmentId;
 import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.RoomRateRepository.ApplicableNightRate;
 import mg.lagrace.api.repositories.EquipmentRepository;

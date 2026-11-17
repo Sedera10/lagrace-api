@@ -1,6 +1,8 @@
 package mg.lagrace.api.models;
 
 import jakarta.persistence.*;
+import mg.lagrace.api.catalog.room.Room;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;

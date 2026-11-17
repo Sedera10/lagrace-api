@@ -1,6 +1,7 @@
 package mg.lagrace.api.services;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -29,17 +30,24 @@ public class MeetingRoomManagementService {
     private final MeetingRoomServiceRepository services;
     private final UnitRepository units;
         private final JdbcTemplate jdbcTemplate;
+        private final Clock clock;
 
     public MeetingRoomManagementService(MeetingRoomRepository rooms, MeetingRoomRateRepository rates,
-            MeetingRoomServiceRepository services, UnitRepository units, JdbcTemplate jdbcTemplate) {
+            MeetingRoomServiceRepository services, UnitRepository units, JdbcTemplate jdbcTemplate, Clock clock) {
         this.rooms = rooms;
         this.rates = rates;
         this.services = services;
         this.units = units;
         this.jdbcTemplate = jdbcTemplate;
+        this.clock = clock;
     }
 
-    public List<MeetingRoom> listRooms() { return rooms.findAll(); }
+    public List<MeetingRoom> listRooms() { return rooms.findAllByOrderByIdMeetingRoomAsc(); }
+
+    @Transactional(readOnly = true)
+    public List<MeetingRoom> availableRooms(LocalDate date, Long excludeBookingMeetingRoomId) {
+        return rooms.findAvailableOn(date, excludeBookingMeetingRoomId);
+    }
 
     @Transactional(readOnly = true)
     public List<MeetingRoomRateResponse> listRates() {
@@ -48,8 +56,13 @@ public class MeetingRoomManagementService {
 
     @Transactional(readOnly = true)
     public List<MeetingRoomRateResponse> currentRates(LocalDate date) {
-        LocalDate effectiveDate = date != null ? date : LocalDate.now();
-        return services.findAll().stream()
+        return currentRates(null, date);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MeetingRoomRateResponse> currentRates(Long serviceId, LocalDate date) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now(clock);
+        return (serviceId == null ? services.findAll() : services.findById(serviceId).stream().toList()).stream()
                 .flatMap(service -> rates.findApplicableByService(
                         service.getIdService(),
                         effectiveDate).stream())
@@ -59,7 +72,7 @@ public class MeetingRoomManagementService {
 
     @Transactional(readOnly = true)
     public List<MeetingRoomRateResponse> otherRates(LocalDate date) {
-        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        LocalDate effectiveDate = date != null ? date : LocalDate.now(clock);
         Set<Long> currentIds = currentRates(effectiveDate).stream()
                 .map(MeetingRoomRateResponse::idRate)
                 .collect(Collectors.toSet());

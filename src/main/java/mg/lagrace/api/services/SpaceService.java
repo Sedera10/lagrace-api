@@ -19,6 +19,7 @@ import mg.lagrace.api.models.Space;
 import mg.lagrace.api.models.SpaceRate;
 import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.AdditionalServiceRepository;
+import mg.lagrace.api.repositories.BookingSpaceRepository;
 import mg.lagrace.api.repositories.SpaceRateRepository;
 import mg.lagrace.api.repositories.SpaceRepository;
 import mg.lagrace.api.repositories.UnitRepository;
@@ -29,14 +30,23 @@ public class SpaceService {
     private final SpaceRateRepository spaceRateRepo;
     private final UnitRepository unitRepo;
     private final AdditionalServiceRepository additionalServices;
+    private final BookingSpaceRepository bookingSpaces;
 
     public SpaceService(SpaceRepository spaceRepo, SpaceRateRepository spaceRateRepo, UnitRepository unitRepo,
-            AdditionalServiceRepository additionalServices
+            AdditionalServiceRepository additionalServices, BookingSpaceRepository bookingSpaces
     ) {
         this.spaceRepo = spaceRepo;
         this.spaceRateRepo = spaceRateRepo;
         this.unitRepo = unitRepo;
         this.additionalServices = additionalServices;
+        this.bookingSpaces = bookingSpaces;
+    }
+
+    public boolean isAvailable(Long spaceId, LocalDate date) {
+        if (spaceId == null) throw new ValidationException("L'espace est obligatoire.", "space.spaceId");
+        if (date == null) throw new ValidationException("La date de l'événement est obligatoire.", "space.eventDate");
+        if (!spaceRepo.existsById(spaceId)) throw new ResourceNotFoundException("Espace introuvable avec l'id : " + spaceId);
+        return !bookingSpaces.existsActiveBookingForSpaceAndDate(spaceId, date);
     }
 
     public List<Space> getSpaces() {

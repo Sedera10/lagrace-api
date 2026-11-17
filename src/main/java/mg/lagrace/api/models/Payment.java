@@ -2,6 +2,7 @@ package mg.lagrace.api.models;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,6 +48,12 @@ public class Payment {
     @Column(name = "note", length = 255)
     private String note;
 
+    @Column(name = "request_id")
+    private UUID requestId;
+
+    @Column(name = "cash_to_hand_back", precision = 12, scale = 2)
+    private BigDecimal cashToHandBack;
+
     @PrePersist
     protected void onCreate() {
         if (paidAt == null) paidAt = OffsetDateTime.now();
@@ -68,4 +75,8 @@ public class Payment {
     public void setReceivedByUser(User receivedByUser) { this.receivedByUser = receivedByUser; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public UUID getRequestId() { return requestId; }
+    public void setRequestId(UUID requestId) { this.requestId = requestId; }
+    public BigDecimal getCashToHandBack() { return cashToHandBack; }
+    public void setCashToHandBack(BigDecimal cashToHandBack) { this.cashToHandBack = cashToHandBack; }
 }

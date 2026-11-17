@@ -5,6 +5,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import mg.lagrace.api.catalog.room.RoomCategory;
+import mg.lagrace.api.catalog.room.RoomStatus;
+import mg.lagrace.api.catalog.room.RoomType;
 import mg.lagrace.api.dto.room.RoomCategoryRequest;
 import mg.lagrace.api.dto.room.RoomStatusRequest;
 import mg.lagrace.api.dto.room.RoomTypeRequest;
@@ -13,9 +16,6 @@ import mg.lagrace.api.exceptions.DuplicateResourceException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.models.Equipment;
-import mg.lagrace.api.models.RoomCategory;
-import mg.lagrace.api.models.RoomStatus;
-import mg.lagrace.api.models.RoomType;
 import mg.lagrace.api.repositories.EquipmentRepository;
 import mg.lagrace.api.repositories.RoomCategoryRepository;
 import mg.lagrace.api.repositories.RoomStatusRepository;

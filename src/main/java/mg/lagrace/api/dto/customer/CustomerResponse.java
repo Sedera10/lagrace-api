@@ -23,7 +23,7 @@ public record CustomerResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
-    public static CustomerResponse from(Customer customer) {
+    public static CustomerResponse from(Customer customer, String maskedIdentificationNumber) {
         return new CustomerResponse(
                 customer.getIdCustomer(),
                 customer.getLastName(),
@@ -32,7 +32,7 @@ public record CustomerResponse(
                 customer.getEmail(),
                 customer.getPhone(),
                 customer.getAddress(),
-                customer.getIdentificationNumber(),
+                maskedIdentificationNumber,
                 customer.getDocument() != null ? customer.getDocument().getIdDocument() : null,
                 customer.getDocument() != null ? customer.getDocument().getName() : null,
                 customer.getNationality() != null ? customer.getNationality().getIdNationality() : null,

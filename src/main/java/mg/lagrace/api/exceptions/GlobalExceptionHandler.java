@@ -32,28 +32,72 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> notFound(ResourceNotFoundException ex) { return response(HttpStatus.NOT_FOUND, ex.getCode(), ex.getMessage()); }
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> business(BusinessException ex) { return response("FORBIDDEN".equals(ex.getCode()) ? HttpStatus.FORBIDDEN : HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage()); }
-    @ExceptionHandler(UnprocessableEntityException.class)
-    public ResponseEntity<ApiResponse<Void>> unprocessable(UnprocessableEntityException ex) { return response(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage()); }
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ApiResponse<Void>> conflict(ConflictException ex) {
+    public ResponseEntity<ApiResponse<Void>> business(BusinessException ex) {
         ApiResponse<Void> body = ApiResponse.apiError(ex.getCode(), ex.getMessage());
+        body.setField(ex.getField());
+        return ResponseEntity.status("FORBIDDEN".equals(ex.getCode()) ? HttpStatus.FORBIDDEN : HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+    @ExceptionHandler(UnprocessableEntityException.class)
+    public ResponseEntity<ApiResponse<Void>> unprocessable(UnprocessableEntityException ex) {
+        ApiResponse<Void> body = ApiResponse.apiError(ex.getCode(), ex.getMessage());
+        body.setField(ex.getField());
+        return ResponseEntity.unprocessableEntity().body(body);
+    }
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Object>> conflict(ConflictException ex) {
+        ApiResponse<Object> body = ApiResponse.apiError(ex.getCode(), ex.getMessage());
         if (ex.getConflictFrom() != null && ex.getConflictTo() != null)
             body.setConflict(new ApiResponse.ConflictPeriod(ex.getConflictFrom().toString(), ex.getConflictTo().toString()));
         body.setField(ex.getField());
         body.setNewTotal(ex.getNewTotal());
+        body.setData(ex.getData());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ApiResponse<Void>> duplicate(DuplicateResourceException ex) { return response(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage()); }
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> dataIntegrity(DataIntegrityViolationException ex) {
-        if (hasSqlState(ex, "23P01")) return response(HttpStatus.CONFLICT, "ROOM_UNAVAILABLE", "Cette chambre est déjà réservée pour cette période.");
-        if (hasSqlState(ex, "23505")) return response(HttpStatus.CONFLICT, "UNIQUE_CONFLICT", "Une réservation concurrente utilise déjà cette ressource.");
-        return response(HttpStatus.CONFLICT, "UNIQUE_CONFLICT", "Violation de contrainte en base de données.");
+        String sqlState = sqlState(ex);
+        String constraint = constraintName(ex);
+        if ("uq_customer_document".equals(constraint))
+            return response(HttpStatus.CONFLICT, "DUPLICATE_DOCUMENT", "Cette pièce d’identité est déjà associée à un client.");
+        if ("23P01".equals(sqlState) || "no_double_room".equals(constraint))
+            return response(HttpStatus.CONFLICT, "ROOM_UNAVAILABLE", "Une autre réservation chevauche la période demandée pour cette chambre.");
+        if ("uq_space_day".equals(constraint))
+            return response(HttpStatus.CONFLICT, "SPACE_UNAVAILABLE", "Cet espace est déjà réservé à cette date.");
+        if ("uq_invoice_line_source".equals(constraint))
+            return response(HttpStatus.CONFLICT, "ALREADY_BILLED", "Cet élément a déjà été facturé.");
+        if ("uq_invoice_line_credited".equals(constraint))
+            return response(HttpStatus.CONFLICT, "CREDIT_NOT_ALLOWED", "Cette ligne a déjà fait l'objet d'un avoir.");
+        if ("23505".equals(sqlState))
+            return response(HttpStatus.CONFLICT, "UNIQUE_CONFLICT", "Une référence existe déjà. Actualisez le dossier puis réessayez.");
+        if ("23503".equals(sqlState))
+            return response(HttpStatus.CONFLICT, "INVALID_REFERENCE", "La chambre, le dossier ou le statut associé n'existe plus. Actualisez puis réessayez.");
+        if ("23514".equals(sqlState))
+            return response(HttpStatus.CONFLICT, "INVALID_DATA", "Les dates ou les valeurs saisies ne respectent pas les contraintes de réservation.");
+        if ("23502".equals(sqlState))
+            return response(HttpStatus.CONFLICT, "MISSING_DATA", "Une donnée obligatoire manque pour enregistrer cette réservation.");
+        String message = constraint == null
+                ? "Une contrainte a refusé cette opération. Actualisez le dossier puis réessayez."
+                : "La contrainte " + constraint + " a refusé cette opération. Actualisez le dossier puis réessayez.";
+        return response(HttpStatus.CONFLICT, "DATABASE_CONSTRAINT", message);
     }
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> illegal(IllegalArgumentException ex) { return response(HttpStatus.BAD_REQUEST, "VALIDATION", ex.getMessage()); }
-    private boolean hasSqlState(Throwable error, String expected) { for (Throwable cause = error; cause != null; cause = cause.getCause()) if (cause instanceof SQLException sql && expected.equals(sql.getSQLState())) return true; return false; }
+    private String sqlState(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql) return sql.getSQLState();
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+                    && violation.getSQLException() != null)
+                return violation.getSQLException().getSQLState();
+        }
+        return null;
+    }
+    private String constraintName(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause())
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation)
+                return violation.getConstraintName();
+        return null;
+    }
     private ResponseEntity<ApiResponse<Void>> response(HttpStatus status, String code, String message) { return ResponseEntity.status(status).body(ApiResponse.apiError(code, message)); }
 }

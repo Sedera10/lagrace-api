@@ -23,8 +23,15 @@ public class MeetingRoomController {
     public MeetingRoomController(MeetingRoomManagementService service) { this.service = service; }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<MeetingRoom>>> listRooms() { 
+    public ResponseEntity<ApiResponse<List<MeetingRoom>>> listRooms(
+            @RequestParam(required = false, defaultValue = "true") boolean active) {
         return ResponseEntity.ok(ApiResponse.success(service.listRooms())); 
+    }
+
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<List<MeetingRoom>>> availability(@RequestParam LocalDate date,
+            @RequestParam(required = false) Long excludeBookingMeetingRoomId) {
+        return ResponseEntity.ok(ApiResponse.success(service.availableRooms(date, excludeBookingMeetingRoomId)));
     }
 
     @PostMapping
@@ -42,7 +49,14 @@ public class MeetingRoomController {
     public ResponseEntity<ApiResponse<Void>> deleteRoom(@PathVariable Long id) { service.deleteRoom(id); return ResponseEntity.ok(ApiResponse.success(null)); }
 
     @GetMapping("/rates")
-    public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> listRates() { return ResponseEntity.ok(ApiResponse.success(service.listRates())); }
+    public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> listRates(
+            @RequestParam(required = false) Long serviceId, @RequestParam(required = false) LocalDate date) {
+        if ((serviceId == null) != (date == null)) {
+            throw new mg.lagrace.api.exceptions.ValidationException("La formule et la date doivent être renseignées ensemble.");
+        }
+        return ResponseEntity.ok(ApiResponse.success(date == null
+                ? service.listRates() : service.currentRates(serviceId, date)));
+    }
 
     @GetMapping("/rates/current")
     public ResponseEntity<ApiResponse<List<MeetingRoomRateResponse>>> currentRates(

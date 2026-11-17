@@ -12,4 +12,7 @@ public interface BookingMeetingRoomRepository extends JpaRepository<BookingMeeti
 
     @Query("SELECT COUNT(line) > 0 FROM BookingMeetingRoom line WHERE line.meetingRoom.idMeetingRoom = :roomId AND line.serviceDate = :serviceDate AND line.active = true")
     boolean existsActiveBookingForRoomAndDate(@Param("roomId") Long roomId, @Param("serviceDate") java.time.LocalDate serviceDate);
+
+    @Query("SELECT COUNT(line) > 0 FROM BookingMeetingRoom line WHERE line.meetingRoom.idMeetingRoom = :roomId AND line.serviceDate = :serviceDate AND line.active = true AND line.idBookingMeetingRoom <> :excludeId")
+    boolean existsActiveBookingForRoomAndDateExcluding(@Param("roomId") Long roomId, @Param("serviceDate") java.time.LocalDate serviceDate, @Param("excludeId") Long excludeId);
 }

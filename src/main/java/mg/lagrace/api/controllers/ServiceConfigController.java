@@ -44,5 +44,11 @@ public class ServiceConfigController {
     @PutMapping("/additional-services/{id}") public ResponseEntity<ApiResponse<AdditionalService>> updateAdditional(@PathVariable Long id, @RequestBody AdditionalServiceRequest r) { return ResponseEntity.ok(ApiResponse.success(service.updateAdditionalService(id, r))); }
     @DeleteMapping("/additional-services/{id}") public ResponseEntity<ApiResponse<Void>> deleteAdditional(@PathVariable Long id) { service.deleteAdditionalService(id); return ResponseEntity.ok(ApiResponse.success(null)); }
 
+    @GetMapping("/menu-categories") public ResponseEntity<ApiResponse<List<MenuCategory>>> menuCategories() { return ResponseEntity.ok(ApiResponse.success(service.getMenuCategories())); }
+    @GetMapping("/menu-categories/{id}") public ResponseEntity<ApiResponse<MenuCategory>> menuCategory(@PathVariable Long id) { return ResponseEntity.ok(ApiResponse.success(service.getMenuCategory(id))); }
+    @PostMapping("/menu-categories") public ResponseEntity<ApiResponse<MenuCategory>> addMenuCategory(@RequestBody MenuCategoryRequest r) { return created(service.addMenuCategory(r)); }
+    @PutMapping("/menu-categories/{id}") public ResponseEntity<ApiResponse<MenuCategory>> updateMenuCategory(@PathVariable Long id, @RequestBody MenuCategoryRequest r) { return ResponseEntity.ok(ApiResponse.success(service.updateMenuCategory(id, r))); }
+    @DeleteMapping("/menu-categories/{id}") public ResponseEntity<ApiResponse<Void>> deleteMenuCategory(@PathVariable Long id) { service.deleteMenuCategory(id); return ResponseEntity.ok(ApiResponse.success(null)); }
+
     private <T> ResponseEntity<ApiResponse<T>> created(T value) { return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(value)); }
 }

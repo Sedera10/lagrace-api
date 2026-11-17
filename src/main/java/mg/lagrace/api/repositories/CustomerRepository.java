@@ -17,14 +17,18 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 		SELECT customer FROM Customer customer
 		LEFT JOIN FETCH customer.document
 		LEFT JOIN FETCH customer.nationality
-		WHERE LOWER(CONCAT(CONCAT(COALESCE(customer.lastName, ''), ' '), COALESCE(customer.firstName, '')))
+		WHERE customer.active = true AND customer.mergedInto IS NULL
+			AND customer.idCustomer <> :walkInCustomerId
+			AND (
+				LOWER(CONCAT(CONCAT(COALESCE(customer.lastName, ''), ' '), COALESCE(customer.firstName, '')))
 				LIKE LOWER(CONCAT('%', :term, '%'))
 			OR LOWER(CONCAT(CONCAT(COALESCE(customer.firstName, ''), ' '), COALESCE(customer.lastName, '')))
 				LIKE LOWER(CONCAT('%', :term, '%'))
 			OR LOWER(COALESCE(customer.phone, '')) LIKE LOWER(CONCAT('%', :term, '%'))
 			OR LOWER(COALESCE(customer.email, '')) LIKE LOWER(CONCAT('%', :term, '%'))
-			OR LOWER(COALESCE(customer.identificationNumber, '')) LIKE LOWER(CONCAT('%', :term, '%'))
+			OR LOWER(COALESCE(customer.identificationNumber, '')) LIKE LOWER(CONCAT('%', :term, '%')))
 		ORDER BY customer.lastName, customer.firstName, customer.idCustomer
 		""")
-	List<Customer> searchForAutocomplete(@Param("term") String term, Pageable pageable);
+	List<Customer> searchForAutocomplete(@Param("term") String term,
+			@Param("walkInCustomerId") Long walkInCustomerId, Pageable pageable);
 }

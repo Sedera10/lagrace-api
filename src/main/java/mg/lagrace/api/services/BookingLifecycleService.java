@@ -7,6 +7,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import mg.lagrace.api.catalog.room.RoomStatus;
 import mg.lagrace.api.dto.booking.BookingDetailResponse;
 import mg.lagrace.api.dto.booking.BookingStatusActionRequest;
 import mg.lagrace.api.exceptions.ConflictException;
@@ -21,6 +22,7 @@ import mg.lagrace.api.repositories.BookingPoolRepository;
 import mg.lagrace.api.repositories.BookingRepository;
 import mg.lagrace.api.repositories.BookingRoomRepository;
 import mg.lagrace.api.repositories.BookingSpaceRepository;
+import mg.lagrace.api.repositories.RoomStatusRepository;
 import mg.lagrace.api.repositories.UserRepository;
 
 @Service
@@ -34,14 +36,17 @@ public class BookingLifecycleService {
     private final UserRepository users;
     private final BookingStatusService statuses;
     private final BookingDetailService details;
+    private final RoomStatusRepository roomStatuses;
+    private final RoomService roomService;
 
     public BookingLifecycleService(BookingRepository bookings, BookingBalanceRepository balances,
             BookingRoomRepository rooms, BookingPoolRepository pools, BookingMeetingRoomRepository meetingRooms,
             BookingSpaceRepository spaces, UserRepository users, BookingStatusService statuses,
-            BookingDetailService details) {
+            BookingDetailService details, RoomStatusRepository roomStatuses, RoomService roomService) {
         this.bookings = bookings; this.balances = balances; this.rooms = rooms; this.pools = pools;
         this.meetingRooms = meetingRooms; this.spaces = spaces; this.users = users;
         this.statuses = statuses; this.details = details;
+        this.roomStatuses = roomStatuses; this.roomService = roomService;
     }
 
     @Transactional
@@ -59,7 +64,8 @@ public class BookingLifecycleService {
     @Transactional
     public BookingDetailResponse close(Long id, BookingStatusActionRequest request,
             Authentication authentication) {
-        Booking booking = booking(id);
+        Booking booking = bookings.findByIdForUpdate(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Dossier introuvable avec l'id : " + id));
         User user = user(authentication);
         requireVersion(booking, request);
         if (!"IN_PROGRESS".equals(code(booking)))
@@ -77,7 +83,32 @@ public class BookingLifecycleService {
             throw new ConflictException("FORBIDDEN_TRANSITION", "Impossible de clôturer : la caution détenue doit être nulle (" + depositHeld + " Ar).");
 
         statuses.changeBookingStatus(booking, "CLOSED", null, user.getIdUser());
+        releaseCheckedOutRooms(id);
         return details.get(id);
+    }
+
+    private void releaseCheckedOutRooms(Long bookingId) {
+        RoomStatus available = roomStatuses.findAll().stream()
+                .filter(status -> isNamed(status, "DISPONIBLE"))
+                .findFirst().orElse(null);
+        if (available == null) return;
+        rooms.findAllByBooking_IdBooking(bookingId).stream()
+                .filter(line -> "CHECK_OUT".equals(code(line.getStatus())))
+                .filter(line -> line.getRoom() != null && isOccupied(line.getRoom().getStatus()))
+                .filter(line -> !Boolean.TRUE.equals(
+                        rooms.existsOtherCheckIn(line.getRoom().getIdRoom(), line.getIdBookingRoom())))
+                .forEach(line -> roomService.changeRoomStatus(line.getRoom().getIdRoom(), available.getIdStatus()));
+    }
+
+    private boolean isOccupied(RoomStatus status) {
+        return isNamed(status, "OCCUPEE");
+    }
+
+    private boolean isNamed(RoomStatus status, String expected) {
+        if (status == null || status.getName() == null) return false;
+        String name = java.text.Normalizer.normalize(status.getName().trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toUpperCase();
+        return expected.equals(name);
     }
 
     private Booking booking(Long id) {

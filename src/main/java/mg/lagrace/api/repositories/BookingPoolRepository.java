@@ -12,6 +12,21 @@ public interface BookingPoolRepository extends JpaRepository<BookingPool, Long> 
     List<BookingPool> findAllByBooking_IdBooking(Long bookingId);
 
     @Query("""
+        SELECT line FROM BookingPool line
+        WHERE line.pool.idPool = :poolId
+          AND line.active = true
+          AND (:excludeId IS NULL OR line.idBookingPool <> :excludeId)
+          AND (
+            (line.poolService.isExculusive = true AND line.startsAt < :to AND line.endsAt > :from)
+            OR (line.poolService.isExculusive = false AND line.startsAt >= :from AND line.startsAt < :to)
+          )
+        ORDER BY line.startsAt
+        """)
+    List<BookingPool> findAvailabilityConflicts(@Param("poolId") Long poolId,
+            @Param("from") OffsetDateTime from, @Param("to") OffsetDateTime to,
+            @Param("excludeId") Long excludeId);
+
+    @Query("""
         SELECT COUNT(line) > 0 FROM BookingPool line
         WHERE line.pool.idPool = :poolId
           AND line.active = true

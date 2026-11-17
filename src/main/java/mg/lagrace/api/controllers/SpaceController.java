@@ -13,6 +13,7 @@ import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.models.enums.PhotoItemType;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,12 @@ public class SpaceController {
     public ResponseEntity<ApiResponse<List<Space>>> Listes() {
         List<Space> spaces = spaceService.getSpaces();
         return ResponseEntity.ok(ApiResponse.success(spaces, "Liste de tous les Salle Espaces"));
+    }
+
+    @GetMapping("/{idSpace}/availability")
+    public ResponseEntity<ApiResponse<Boolean>> isAvailable(@PathVariable Long idSpace,
+            @RequestParam LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(spaceService.isAvailable(idSpace, date)));
     }
     @PostMapping
     public ResponseEntity<ApiResponse<Space>> addSpace(@RequestBody SpaceRequest request) {

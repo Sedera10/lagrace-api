@@ -11,6 +11,8 @@ import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.PoolManagmentService;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -30,7 +32,8 @@ public class PoolController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Pool>>> Listes() {
+    public ResponseEntity<ApiResponse<List<Pool>>> Listes(
+            @RequestParam(required = false, defaultValue = "true") boolean active) {
         List<Pool> spaces = poolService.getPools();
         return ResponseEntity.ok(ApiResponse.success(spaces, "Liste de tous les Piscines"));
     }
@@ -38,9 +41,19 @@ public class PoolController {
     // ================ TARIFS ================= //
 
     @GetMapping("/{idPool}/rates")
-    public ResponseEntity<ApiResponse<List<PoolRateResponse>>> getRates(@PathVariable Long idPool) {
-        List<PoolRateResponse> rates = poolService.allRates(idPool);
+    public ResponseEntity<ApiResponse<List<PoolRateResponse>>> getRates(@PathVariable Long idPool,
+            @RequestParam Long serviceId, @RequestParam LocalDate date) {
+        List<PoolRateResponse> rates = poolService.applicableRates(idPool, serviceId, date);
         return ResponseEntity.ok(ApiResponse.success(rates, "Liste des tarifs pour Piscine"));
+    }
+
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<List<mg.lagrace.api.dto.pool.PoolAvailabilityResponse>>> availability(
+            @RequestParam Long poolId, @RequestParam OffsetDateTime from, @RequestParam OffsetDateTime to,
+            @RequestParam(required = false) Long excludeBookingPoolId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                poolService.availability(poolId, from, to, excludeBookingPoolId),
+                "Conflits de disponibilité de la piscine."));
     }
 
     @GetMapping("/{idPool}/rates/currents")

@@ -1,6 +1,6 @@
 package mg.lagrace.api.dto.room.photo;
 
-import mg.lagrace.api.models.RoomPhoto;
+import mg.lagrace.api.catalog.room.RoomPhoto;
 
 public record RoomPhotoResponse(
         Long id,

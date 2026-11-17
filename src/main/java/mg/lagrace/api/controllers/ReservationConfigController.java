@@ -5,21 +5,31 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import mg.lagrace.api.dto.ApiResponse;
+import mg.lagrace.api.dto.booking.BookingStatusRequest;
 import mg.lagrace.api.dto.reservation.CodeNameRequest;
-import mg.lagrace.api.dto.reservation.ReservationStatusRequest;
 import mg.lagrace.api.models.*;
+import mg.lagrace.api.services.BookingStatusService;
 import mg.lagrace.api.services.ReservationConfigService;
 
 @RestController
-@RequestMapping("/reservation-configs")
+@RequestMapping("/booking-configs")
 public class ReservationConfigController {
     private final ReservationConfigService service;
-    public ReservationConfigController(ReservationConfigService service) { this.service = service; }
+    private final BookingStatusService service2;
+    public ReservationConfigController(ReservationConfigService service, BookingStatusService service2) { 
+        this.service = service; 
+        this.service2 = service2;
+    }
 
-    @GetMapping("/statuses") public ResponseEntity<ApiResponse<List<ReservationStatus>>> statuses() { return ResponseEntity.ok(ApiResponse.success(service.getReservationStatuses())); }
-    @PostMapping("/statuses") public ResponseEntity<ApiResponse<ReservationStatus>> addStatus(@RequestBody ReservationStatusRequest r) { return created(service.addReservationStatus(r)); }
-    @PutMapping("/statuses/{id}") public ResponseEntity<ApiResponse<ReservationStatus>> updateStatus(@PathVariable Long id, @RequestBody ReservationStatusRequest r) { return ResponseEntity.ok(ApiResponse.success(service.updateReservationStatus(id, r))); }
-    @DeleteMapping("/statuses/{id}") public ResponseEntity<ApiResponse<Void>> deleteStatus(@PathVariable Long id) { service.deleteReservationStatus(id); return ResponseEntity.ok(ApiResponse.success(null)); }
+    @GetMapping("/statuses") public ResponseEntity<ApiResponse<List<BookingStatus>>> statuses() { return ResponseEntity.ok(ApiResponse.success(service2.getAllBokingStatus())); }
+    @PostMapping("/statuses") public ResponseEntity<ApiResponse<BookingStatus>> addStatus(@RequestBody BookingStatusRequest r) { return created(service2.addBookingStatus(r)); }
+    @PutMapping("/statuses/{id}") public ResponseEntity<ApiResponse<BookingStatus>> updateStatus(@PathVariable Long id, @RequestBody BookingStatusRequest r) { return ResponseEntity.ok(ApiResponse.success(service2.updateBookingStatus(id, r))); }
+    @DeleteMapping("/statuses/{id}") public ResponseEntity<ApiResponse<Void>> deleteStatus(@PathVariable Long id) { service2.deleteBookingStatus(id); return ResponseEntity.ok(ApiResponse.success(null)); }
+
+    @GetMapping("/line-statuses") public ResponseEntity<ApiResponse<List<BookingLineStatus>>> lineStatuses() { return ResponseEntity.ok(ApiResponse.success(service2.getAllBokingLineStatus())); }
+    @PostMapping("/line-statuses") public ResponseEntity<ApiResponse<BookingLineStatus>> addLineStatus(@RequestBody BookingStatusRequest r) { return created(service2.addBookingLineStatus(r)); }
+    @PutMapping("/line-statuses/{id}") public ResponseEntity<ApiResponse<BookingLineStatus>> updateLineStatus(@PathVariable Long id, @RequestBody BookingStatusRequest r) { return ResponseEntity.ok(ApiResponse.success(service2.updateBookingLineStatus(id, r))); }
+    @DeleteMapping("/line-statuses/{id}") public ResponseEntity<ApiResponse<Void>> deleteLineStatus(@PathVariable Long id) { service2.deleteBookingLineStatus(id); return ResponseEntity.ok(ApiResponse.success(null)); }
 
     @GetMapping("/payment-methods") public ResponseEntity<ApiResponse<List<PaymentMethod>>> methods() { return ResponseEntity.ok(ApiResponse.success(service.getPaymentMethods())); }
     @PostMapping("/payment-methods") public ResponseEntity<ApiResponse<PaymentMethod>> addMethod(@RequestBody CodeNameRequest r) { return created(service.addPaymentMethod(r)); }

@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ import mg.lagrace.api.repositories.UserRepository;
 @Service
 public class BookingCancellationService {
     private static final String CANCEL_REASON = "Dossier annulé";
+    private static final String SPACE_EVENT_CANCEL_REASON = "Événement annulé";
 
     private final BookingRepository bookings;
     private final BookingRoomRepository rooms;
@@ -71,17 +73,54 @@ public class BookingCancellationService {
             Authentication authentication) {
         BookingRoom line = rooms.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ligne chambre introuvable avec l'id : " + id));
-        Booking booking = openBooking(line.getBooking());
+        return cancelLine(line.getBooking(), line.getVersion(), code(line.getStatus()), request, authentication, false, null,
+                (reason, userId) -> statuses.changeLineStatus(line, "CANCELED", reason, userId));
+    }
+
+    @Transactional
+    public BookingDetailResponse cancelSpace(Long id, BookingRoomCancelRequest request,
+            Authentication authentication) {
+        BookingSpace line = spaces.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ligne espace introuvable avec l'id : " + id));
+        return cancelLine(line.getBooking(), line.getVersion(), code(line.getStatus()), request, authentication, true, null,
+                (reason, userId) -> statuses.changeLineStatus(line, "CANCELED", reason, userId));
+    }
+
+        @Transactional
+        public BookingDetailResponse cancelPool(Long id, BookingRoomCancelRequest request,
+            Authentication authentication) {
+        BookingPool line = pools.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Ligne piscine introuvable avec l'id : " + id));
+        return cancelLine(line.getBooking(), line.getVersion(), code(line.getStatus()), request, authentication, false, "POOL",
+            (reason, userId) -> statuses.changeLineStatus(line, "CANCELED", reason, userId));
+        }
+
+        @Transactional
+        public BookingDetailResponse cancelMeetingRoom(Long id, BookingRoomCancelRequest request,
+            Authentication authentication) {
+        BookingMeetingRoom line = meetingRooms.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Ligne salle de réunion introuvable avec l'id : " + id));
+        return cancelLine(line.getBooking(), line.getVersion(), code(line.getStatus()), request, authentication, false, "MEETING_ROOM",
+            (reason, userId) -> statuses.changeLineStatus(line, "CANCELED", reason, userId));
+        }
+
+    private BookingDetailResponse cancelLine(Booking booking, Integer version, String lineStatus,
+            BookingRoomCancelRequest request, Authentication authentication, boolean spaceLine, String domainScope,
+            BiConsumer<String, Long> cancel) {
+        booking = openBooking(booking);
         User user = requireUser(authentication);
         requireReason(request == null ? null : request.reason());
-        if (request == null || request.version() == null || !request.version().equals(line.getVersion()))
-            throw new ConflictException("STALE_VERSION", "La ligne chambre a été modifiée par quelqu'un d'autre.");
-        if (!"CONFIRMED".equals(code(line.getStatus())))
+        if (request == null || request.version() == null || !request.version().equals(version))
+            throw new ConflictException("STALE_VERSION", "La ligne a été modifiée par quelqu'un d'autre.");
+        if (!"CONFIRMED".equals(lineStatus))
             throw new ConflictException("FORBIDDEN_TRANSITION", "Seule une ligne CONFIRMED peut être annulée.");
 
         addFee(booking, request.cancellationFee(), user, request.reason());
-        statuses.changeLineStatus(line, "CANCELED", request.reason().trim(), user.getIdUser());
-        return cancellationResponse(booking, !hasActiveLine(booking.getIdBooking()), false);
+        if (spaceLine) voidSpaceEventCharges(booking, user, request.reason());
+        if (domainScope != null && isLastActiveDomainLine(booking.getIdBooking(), domainScope))
+            voidDomainServiceCharges(booking, user, request.reason(), domainScope);
+        cancel.accept(request.reason().trim(), user.getIdUser());
+        return cancellationResponse(booking, !hasActiveLine(booking.getIdBooking()), spaceLine);
     }
 
     @Transactional
@@ -125,7 +164,7 @@ public class BookingCancellationService {
 
     private void voidOthers(Booking booking, User user, String reason) {
         for (BookingOther other : others.findAllByBooking_IdBookingOrderByCreatedAtDesc(booking.getIdBooking())) {
-            if (other.getVoidedAt() != null) continue;
+            if (other.getVoidedAt() != null || Boolean.TRUE.equals(other.getIsCancellationFee())) continue;
             OffsetDateTime now = OffsetDateTime.now(clock);
             other.setVoidedAt(now); other.setVoidReason(CANCEL_REASON); others.saveAndFlush(other);
             logger.log(booking.getIdBooking(), "OTHER", other.getIdBookingOther(), "VOID", "void_reason", null,
@@ -133,12 +172,62 @@ public class BookingCancellationService {
         }
     }
 
+
+    private void voidSpaceEventCharges(Booking booking, User user, String reason) {
+        for (BookingCharge charge : charges.findAllByBooking_IdBooking(booking.getIdBooking())) {
+            if (charge.getVoidedAt() != null || !isSpaceEventCharge(charge)) continue;
+            OffsetDateTime now = OffsetDateTime.now(clock);
+            charge.setVoidedAt(now);
+            charge.setVoidReason(SPACE_EVENT_CANCEL_REASON);
+            charges.saveAndFlush(charge);
+            UUID operationId = UUID.randomUUID();
+            logger.log(booking.getIdBooking(), "CHARGE", charge.getIdBookingCharge(), "VOID", "voided_at", null,
+                    now, reason, user.getIdUser(), operationId);
+            logger.log(booking.getIdBooking(), "CHARGE", charge.getIdBookingCharge(), "VOID", "void_reason", null,
+                    SPACE_EVENT_CANCEL_REASON, reason, user.getIdUser(), operationId);
+        }
+    }
+
+    /** Restaurant charges deliberately have no additional-service scope and remain billable. */
+    private void voidDomainServiceCharges(Booking booking, User user, String reason, String domainScope) {
+        for (BookingCharge charge : charges.findAllByBooking_IdBooking(booking.getIdBooking())) {
+            if (charge.getVoidedAt() != null || charge.getAdditionalService() == null
+                    || charge.getAdditionalService().getScope() == null) continue;
+            String scope = charge.getAdditionalService().getScope().getCode();
+            if (!domainScope.equalsIgnoreCase(scope)) continue;
+            OffsetDateTime now = OffsetDateTime.now(clock);
+            charge.setVoidedAt(now); charge.setVoidReason("Réservation annulée");
+            charges.saveAndFlush(charge);
+            UUID operationId = UUID.randomUUID();
+            logger.log(booking.getIdBooking(), "CHARGE", charge.getIdBookingCharge(), "VOID", "voided_at", null,
+                    now, reason, user.getIdUser(), operationId);
+            logger.log(booking.getIdBooking(), "CHARGE", charge.getIdBookingCharge(), "VOID", "void_reason", null,
+                    "Réservation annulée", reason, user.getIdUser(), operationId);
+        }
+    }
+
+    private boolean isLastActiveDomainLine(Long bookingId, String domainScope) {
+        return switch (domainScope) {
+            case "POOL" -> pools.findAllByBooking_IdBooking(bookingId).stream().filter(line -> Boolean.TRUE.equals(line.getActive())).count() <= 1;
+            case "MEETING_ROOM" -> meetingRooms.findAllByBooking_IdBooking(bookingId).stream().filter(line -> Boolean.TRUE.equals(line.getActive())).count() <= 1;
+            default -> false;
+        };
+    }
+
+    private boolean isSpaceEventCharge(BookingCharge charge) {
+        if (Boolean.TRUE.equals(charge.getDeposit())) return false;
+        if (charge.getBanquetRate() != null) return true;
+        if (charge.getAdditionalService() == null || charge.getAdditionalService().getScope() == null) return false;
+        String scope = charge.getAdditionalService().getScope().getCode();
+        return "SPACE".equalsIgnoreCase(scope) || "BANQUET".equalsIgnoreCase(scope);
+    }
     private void addFee(Booking booking, BookingCancellationFee fee, User user, String reason) {
         if (fee == null) return;
         if (fee.label() == null || fee.label().isBlank() || fee.amount() == null || fee.amount().signum() <= 0)
             throw new ValidationException("Le libellé et le montant des frais d'annulation sont obligatoires.");
         BookingOther other = new BookingOther();
         other.setBooking(booking); other.setLabel(fee.label().trim()); other.setAmount(fee.amount());
+        other.setIsCancellationFee(true);
         other.setCreatedByUser(user); OffsetDateTime now = OffsetDateTime.now(clock);
         other.setCreatedAt(now); other.setUpdatedAt(now);
         other = others.saveAndFlush(other);
@@ -171,13 +260,13 @@ public class BookingCancellationService {
                 || spaces.findAllByBooking_IdBooking(bookingId).stream().anyMatch(line -> statusesToFind.contains(code(line.getStatus())));
     }
 
-    private BookingDetailResponse cancellationResponse(Booking booking, boolean noActiveLine, boolean canceledBooking) {
+    private BookingDetailResponse cancellationResponse(Booking booking, boolean noActiveLine, boolean includeDepositToReturn) {
         BookingBalance balance = balances.findById(booking.getIdBooking())
                 .orElseThrow(() -> new IllegalStateException("Solde introuvable."));
         BigDecimal refundDue = n(balance.getPaid()).subtract(n(balance.getTotal())).max(BigDecimal.ZERO);
         BigDecimal depositToReturn = n(balance.getDepositHeld());
         return details.get(booking.getIdBooking()).withCancellationSummary(noActiveLine, refundDue,
-                canceledBooking ? depositToReturn : null);
+            includeDepositToReturn ? depositToReturn : null);
     }
 
     private User requireUser(Authentication authentication) {

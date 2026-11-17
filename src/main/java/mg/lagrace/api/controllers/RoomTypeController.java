@@ -3,6 +3,7 @@ package mg.lagrace.api.controllers;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import mg.lagrace.api.catalog.room.RoomTypeEquipment;
 import mg.lagrace.api.dto.ApiResponse;
 import mg.lagrace.api.dto.photo.PhotoResponse;
 import mg.lagrace.api.dto.photo.UpdatePhotoRequest;
@@ -14,7 +15,6 @@ import mg.lagrace.api.dto.room.rate.RoomRateResponse;
 import mg.lagrace.api.dto.room.rate.UpdateRoomRateRequest;
 import mg.lagrace.api.services.PhotoService;
 import mg.lagrace.api.services.RoomTypeService;
-import mg.lagrace.api.models.RoomTypeEquipment;
 import mg.lagrace.api.models.enums.PhotoItemType;
 
 import java.io.IOException;

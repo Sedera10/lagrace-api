@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import mg.lagrace.api.models.RoomPhoto;
+import mg.lagrace.api.catalog.room.RoomPhoto;
 
 public interface RoomPhotoRepository extends JpaRepository<RoomPhoto,Long> {
     List<RoomPhoto> findByRoom_IdRoomOrderByIsCoverDescIdPhotoAsc(Long roomId);

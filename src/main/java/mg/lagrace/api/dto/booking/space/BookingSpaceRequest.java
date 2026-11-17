@@ -29,6 +29,7 @@ public record BookingSpaceRequest(
         List<@Valid @NotNull ExtraItem> extras,
         List<@Valid @NotNull RoomItem> rooms,
         List<@Valid @NotNull MeetingRoomItem> meetingRooms,
+        @Valid DepositItem deposit,
         @Valid AdvanceItem advance,
         Boolean confirm,
         @PositiveOrZero BigDecimal expectedTotal) {
@@ -53,7 +54,8 @@ public record BookingSpaceRequest(
     public record ExtraItem(
             Long additionalServiceId,
             Long menuItemId,
-            @NotNull @Min(1) Integer quantity) {
+            @NotNull @Min(1) Integer quantity,
+            Boolean included) {
         @JsonIgnore
         @AssertTrue(message = "Indiquez une seule source par extra")
         public boolean isSingleSource() {
@@ -82,4 +84,6 @@ public record BookingSpaceRequest(
     public record AdvanceItem(
             @NotNull Long methodId,
             @NotNull @DecimalMin("0.01") BigDecimal amount) {}
+
+    public record DepositItem(@NotNull Long methodId) {}
 }

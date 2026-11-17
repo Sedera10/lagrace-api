@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
 
+@SuppressWarnings("deprecation")
 @Entity
 @Table(name = "employee")
 @Check(constraints = "end_date IS NULL OR end_date >= hire_date")

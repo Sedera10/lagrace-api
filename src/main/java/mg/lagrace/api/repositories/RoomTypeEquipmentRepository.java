@@ -5,8 +5,8 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import mg.lagrace.api.models.RoomTypeEquipment;
-import mg.lagrace.api.models.RoomTypeEquipmentId;
+import mg.lagrace.api.catalog.room.RoomTypeEquipment;
+import mg.lagrace.api.catalog.room.RoomTypeEquipmentId;
 
 public interface RoomTypeEquipmentRepository
         extends JpaRepository<RoomTypeEquipment, RoomTypeEquipmentId> {

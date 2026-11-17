@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import mg.lagrace.api.models.RoomRate;
+import mg.lagrace.api.catalog.room.RoomRate;
 
 public interface RoomRateRepository extends JpaRepository<RoomRate,Long> {
   interface ApplicableNightRate {

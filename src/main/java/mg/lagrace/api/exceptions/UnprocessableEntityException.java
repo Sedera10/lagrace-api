@@ -8,4 +8,8 @@ public class UnprocessableEntityException extends BusinessException {
     public UnprocessableEntityException(String code, String message) {
         super(code, message);
     }
+
+    public UnprocessableEntityException(String code, String message, String field) {
+        super(code, message, field);
+    }
 }

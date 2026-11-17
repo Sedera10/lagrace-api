@@ -3,7 +3,8 @@ package mg.lagrace.api.repositories;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import mg.lagrace.api.models.RoomStatus;
+
+import mg.lagrace.api.catalog.room.RoomStatus;
 
 public interface RoomStatusRepository extends JpaRepository<RoomStatus, Long>{
     Optional<RoomStatus> findByName(String name);

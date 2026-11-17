@@ -1,6 +1,6 @@
 package mg.lagrace.api.dto.room.equipment;
 
-import mg.lagrace.api.models.RoomTypeEquipment;
+import mg.lagrace.api.catalog.room.RoomTypeEquipment;
 
 public record RoomTypeEquipmentResponse(
         Long typeId,

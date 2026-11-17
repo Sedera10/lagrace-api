@@ -2,7 +2,7 @@ package mg.lagrace.api.dto.room;
 
 import java.time.OffsetDateTime;
 
-import mg.lagrace.api.models.RoomStatusHistory;
+import mg.lagrace.api.catalog.room.RoomStatusHistory;
 
 public record RoomStatusHistoryResponse(
         Long idHistory,

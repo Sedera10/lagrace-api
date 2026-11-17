@@ -17,6 +17,7 @@ public interface BookingRoomRepository extends JpaRepository<BookingRoom, Long> 
         FROM BookingRoom br
         WHERE br.room.idRoom = :roomId
             AND br.active = true 
+            AND br.booking.status.code NOT IN ('CLOSED', 'CANCELED')
             AND (:excludeId IS NULL OR br.idBookingRoom <> :excludeId)
         AND br.checkIn < :checkOut
         AND br.checkOut > :checkIn
@@ -32,6 +33,7 @@ public interface BookingRoomRepository extends JpaRepository<BookingRoom, Long> 
         SELECT br FROM BookingRoom br
         WHERE br.room.idRoom = :roomId
             AND br.active = true
+            AND br.booking.status.code NOT IN ('CLOSED', 'CANCELED')
             AND (:excludeId IS NULL OR br.idBookingRoom <> :excludeId)
             AND br.checkIn < :toDate
             AND br.checkOut > :fromDate

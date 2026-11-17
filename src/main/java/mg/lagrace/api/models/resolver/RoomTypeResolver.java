@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
-import mg.lagrace.api.models.RoomType;
+import mg.lagrace.api.catalog.room.RoomType;
 import mg.lagrace.api.models.enums.PhotoItemType;
 import mg.lagrace.api.repositories.RoomTypeRepository;
 

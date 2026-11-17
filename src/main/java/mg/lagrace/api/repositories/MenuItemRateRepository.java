@@ -9,6 +9,7 @@ import mg.lagrace.api.models.MenuItemRate;
 
 public interface MenuItemRateRepository extends JpaRepository<MenuItemRate, Long> {
     List<MenuItemRate> findAllByMenuItem_IdMenuItemOrderByValidFromDesc(Long menuItemId);
+  boolean existsByMenuItem_IdMenuItem(Long menuItemId);
 
     // Un seul tarif applicable à la date donnée pour un menu item
     @Query(value = """

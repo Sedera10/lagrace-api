@@ -12,6 +12,7 @@ public class BookingChangeLogger {
     private final BookingChangeLogRepository repository;
     private final UserRepository users;
         private final ThreadLocal<UUID> operationContext = new ThreadLocal<>();
+        private final ThreadLocal<Integer> operationDepth = new ThreadLocal<>();
 
     public BookingChangeLogger(BookingChangeLogRepository repository, UserRepository users) {
         this.repository = repository;
@@ -19,12 +20,17 @@ public class BookingChangeLogger {
     }
 
         public UUID beginOperation() {
-            UUID operationId = UUID.randomUUID();
-            operationContext.set(operationId);
+            UUID operationId = operationContext.get();
+            if (operationId == null) { operationId = UUID.randomUUID(); operationContext.set(operationId); operationDepth.set(0); }
+            operationDepth.set(operationDepth.get() + 1);
             return operationId;
         }
 
-        public void endOperation() { operationContext.remove(); }
+        public void endOperation() {
+            int depth = operationDepth.get() == null ? 1 : operationDepth.get() - 1;
+            if (depth <= 0) { operationContext.remove(); operationDepth.remove(); }
+            else operationDepth.set(depth);
+        }
 
     public void log(Long bookingId, String objectType, Long objectId, String action,
                     String fieldName, Object oldValue, Object newValue, String reason,

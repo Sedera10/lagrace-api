@@ -39,6 +39,12 @@ public class BookingOther {
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "is_cancellation_fee", nullable = false)
+    private Boolean isCancellationFee = false;
+
+    @Column(name = "is_discount", nullable = false)
+    private Boolean isDiscount = false;
+
     @Column(name = "voided_at")
     private OffsetDateTime voidedAt;
 
@@ -69,6 +75,10 @@ public class BookingOther {
     public void setLabel(String label) { this.label = label; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public Boolean getIsCancellationFee() { return isCancellationFee; }
+    public void setIsCancellationFee(Boolean isCancellationFee) { this.isCancellationFee = isCancellationFee; }
+    public Boolean getIsDiscount() { return isDiscount; }
+    public void setIsDiscount(Boolean isDiscount) { this.isDiscount = isDiscount; }
     public OffsetDateTime getVoidedAt() { return voidedAt; }
     public void setVoidedAt(OffsetDateTime voidedAt) { this.voidedAt = voidedAt; }
     public String getVoidReason() { return voidReason; }

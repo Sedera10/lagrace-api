@@ -1,6 +1,8 @@
 package mg.lagrace.api.services;
 
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,15 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import mg.lagrace.api.dto.pool.PoolRateRequest;
 import mg.lagrace.api.dto.pool.PoolRateResponse;
+import mg.lagrace.api.dto.pool.PoolAvailabilityResponse;
 import mg.lagrace.api.exceptions.ValidationException;
 import mg.lagrace.api.exceptions.ResourceNotFoundException;
 import mg.lagrace.api.models.Pool;
 import mg.lagrace.api.models.PoolRate;
 import mg.lagrace.api.models.PoolService;
+import mg.lagrace.api.models.BookingPool;
 import mg.lagrace.api.models.Unit;
 import mg.lagrace.api.repositories.PoolRepository;
 import mg.lagrace.api.repositories.PoolRateRepository;
 import mg.lagrace.api.repositories.PoolServiceRepository;
+import mg.lagrace.api.repositories.BookingPoolRepository;
 import mg.lagrace.api.repositories.UnitRepository;
 
 @Service
@@ -29,20 +34,51 @@ public class PoolManagmentService {
     private final PoolRepository poolRepo;
     private final PoolServiceRepository poolServiceRepo;
     private final UnitRepository unitRepo;
+    private final BookingPoolRepository bookingPools;
+    private final Clock clock;
 
     public PoolManagmentService(
             PoolRateRepository rateRepo,
             PoolRepository poolRepo,
             PoolServiceRepository poolServiceRepo,
-            UnitRepository unitRepo) {
+            UnitRepository unitRepo, BookingPoolRepository bookingPools, Clock clock) {
         this.rateRepo = rateRepo;
         this.poolRepo = poolRepo;
         this.poolServiceRepo = poolServiceRepo;
         this.unitRepo = unitRepo;
+        this.bookingPools = bookingPools;
+        this.clock = clock;
     }
 
     public List<Pool> getPools() {
-        return poolRepo.findAll();
+        return poolRepo.findAllByOrderByIdPoolAsc();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PoolRateResponse> applicableRates(Long poolId, Long serviceId, LocalDate date) {
+        if (serviceId != null) {
+            return rateRepo.findApplicableByPoolAndService(poolId, serviceId, date).stream()
+                    .map(PoolRateResponse::from).toList();
+        }
+        return poolServiceRepo.findAll().stream()
+                .flatMap(service -> rateRepo.findApplicableByPoolAndService(poolId, service.getIdService(), date).stream())
+                .map(PoolRateResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PoolAvailabilityResponse> availability(Long poolId, java.time.OffsetDateTime from,
+            java.time.OffsetDateTime to, Long excludeBookingPoolId) {
+        if (from == null || to == null || !from.isBefore(to))
+            throw new ValidationException("La période de disponibilité doit avoir une fin postérieure au début.");
+        return bookingPools.findAvailabilityConflicts(poolId, from, to, excludeBookingPoolId).stream()
+                .map(this::availabilityResponse).toList();
+    }
+
+    private PoolAvailabilityResponse availabilityResponse(BookingPool line) {
+        return new PoolAvailabilityResponse(line.getIdBookingPool(), line.getBooking().getRef(),
+                line.getPool().getIdPool(), line.getPool().getName(), line.getPoolService().getName(),
+                Boolean.TRUE.equals(line.getPoolService().getIsExculusive()), line.getStartsAt(), line.getEndsAt(),
+                line.getGuestsCount(), line.getQuantity());
     }
 
     // =========== LISTE - GET (Tarifs) ============
@@ -56,7 +92,7 @@ public class PoolManagmentService {
 
     @Transactional(readOnly = true)
     public List<PoolRateResponse> currentRates(Long poolId, LocalDate date) {
-        LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
+        LocalDate effectiveDate = (date != null) ? date : LocalDate.now(clock.withZone(ZoneId.of("Indian/Antananarivo")));
         List<PoolRate> currentRates = new ArrayList<>();
         for (PoolService service : poolServiceRepo.findAll()) {
             currentRates.addAll(rateRepo.findApplicableByPoolAndService(

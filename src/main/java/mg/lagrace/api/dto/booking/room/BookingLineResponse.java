@@ -18,7 +18,8 @@ public record BookingLineResponse(
         BigDecimal amount,
         Long statusId,
         String statusCode,
-        Boolean active) {
+        Boolean active,
+        Boolean main) {
 
     public static BookingLineResponse from(BookingLineView line) {
         return new BookingLineResponse(
@@ -34,6 +35,7 @@ public record BookingLineResponse(
                 line.getAmount(),
                 line.getStatusId(),
                 line.getStatusCode(),
-                line.getActive());
+                line.getActive(),
+                false);
     }
 }

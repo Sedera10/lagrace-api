@@ -10,4 +10,5 @@ public record AdditionalServiceRequest(
         BigDecimal price,
         Boolean deposit,
         CateringCondition cateringCondition,
+        Boolean freeWithCaterer,
         Boolean active) {}

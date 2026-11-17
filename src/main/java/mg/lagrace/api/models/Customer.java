@@ -41,6 +41,26 @@ public class Customer {
     @JoinColumn(name = "nationality_id")
     private Nationality nationality;
 
+    @Column(name = "phone_key", insertable = false, updatable = false, length = 9)
+    private String phoneKey;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean active = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "merged_into_id")
+    private Customer mergedInto;
+
+    @Column(name = "preferred_language", length = 5)
+    private String preferredLanguage;
+
+    @Column(name = "contact_consent", nullable = false)
+    private boolean contactConsent;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -79,6 +99,17 @@ public class Customer {
     public void setDocument(IdentificationDocument document) { this.document = document; }
     public Nationality getNationality() { return nationality; }
     public void setNationality(Nationality nationality) { this.nationality = nationality; }
+    public String getPhoneKey() { return phoneKey; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
+    public Customer getMergedInto() { return mergedInto; }
+    public void setMergedInto(Customer mergedInto) { this.mergedInto = mergedInto; }
+    public String getPreferredLanguage() { return preferredLanguage; }
+    public void setPreferredLanguage(String preferredLanguage) { this.preferredLanguage = preferredLanguage; }
+    public boolean isContactConsent() { return contactConsent; }
+    public void setContactConsent(boolean contactConsent) { this.contactConsent = contactConsent; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
