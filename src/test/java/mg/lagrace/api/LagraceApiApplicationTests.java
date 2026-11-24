@@ -1,5 +1,15 @@
 package mg.lagrace.api;
 
+import mg.lagrace.api.catalog.additionalservice.CateringCondition;
+import mg.lagrace.api.catalog.meetingroom.MeetingRoom;
+import mg.lagrace.api.catalog.pool.Pool;
+import mg.lagrace.api.catalog.room.Room;
+import mg.lagrace.api.catalog.space.BanquetMenuType;
+import mg.lagrace.api.customer.Customer;
+import mg.lagrace.api.payment.Payment;
+
+import mg.lagrace.api.catalog.space.application.SpaceService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,60 +34,59 @@ import org.springframework.test.util.ReflectionTestUtils;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
-import com.cloudinary.Cloudinary;
-import mg.lagrace.api.models.BanquetRate;
-import mg.lagrace.api.models.BookingCharge;
-
-import mg.lagrace.api.dto.booking.BookingBanquetCreateRequest;
-import mg.lagrace.api.dto.booking.BookingChargeUpdateRequest;
-import mg.lagrace.api.dto.booking.BookingChargeVoidRequest;
-import mg.lagrace.api.dto.booking.BookingChargeCreateRequest;
-import mg.lagrace.api.dto.booking.BookingDepositRequest;
-import mg.lagrace.api.dto.booking.BookingDepositReturnRequest;
-import mg.lagrace.api.dto.booking.BookingCancelRequest;
-import mg.lagrace.api.dto.booking.BookingCancellationFee;
-import mg.lagrace.api.dto.booking.BookingRoomCancelRequest;
-import mg.lagrace.api.models.Booking;
-import mg.lagrace.api.models.AdditionalService;
-import mg.lagrace.api.repositories.BookingChargeRepository;
-import mg.lagrace.api.repositories.BanquetRateRepository;
-import mg.lagrace.api.repositories.AdditionalServiceRepository;
-import mg.lagrace.api.repositories.BookingOtherRepository;
-import mg.lagrace.api.repositories.PaymentMethodRepository;
-import mg.lagrace.api.repositories.PaymentRepository;
-import mg.lagrace.api.models.Space;
-import mg.lagrace.api.dto.booking.BookingSpaceUpdateRequest;
-import mg.lagrace.api.services.BookingChargeService;
-import mg.lagrace.api.services.BookingPaymentService;
-import mg.lagrace.api.services.BookingCancellationService;
-import mg.lagrace.api.dto.booking.space.BookingSpaceRequest;
-import mg.lagrace.api.dto.booking.pool.BookingPoolRequest;
-import mg.lagrace.api.dto.booking.meeting.BookingMeetingRoomRequest;
-import mg.lagrace.api.repositories.BookingRepository;
-import mg.lagrace.api.repositories.BookingStatusRepository;
-import mg.lagrace.api.repositories.CustomerRepository;
-import mg.lagrace.api.repositories.SpaceRepository;
-import mg.lagrace.api.services.BookingSpaceService;
-import mg.lagrace.api.services.BookingSpaceActionService;
-import mg.lagrace.api.services.BookingDetailService;
-import mg.lagrace.api.dto.booking.BookingStatusActionRequest;
-import mg.lagrace.api.repositories.BookingSpaceRepository;
-import mg.lagrace.api.repositories.RoomDetailRepository;
-import mg.lagrace.api.repositories.RoomRepository;
-import mg.lagrace.api.repositories.RoomStatusHistoryRepository;
-import mg.lagrace.api.repositories.RoomStatusRepository;
-import mg.lagrace.api.repositories.RoomTypeRepository;
-import mg.lagrace.api.repositories.PoolRepository;
-import mg.lagrace.api.repositories.PoolServiceRepository;
-import mg.lagrace.api.repositories.PoolRateRepository;
-import mg.lagrace.api.repositories.MeetingRoomRepository;
-import mg.lagrace.api.repositories.MeetingRoomServiceRepository;
-import mg.lagrace.api.repositories.MeetingRoomRateRepository;
-import mg.lagrace.api.repositories.UserRepository;
-import mg.lagrace.api.services.RoomService;
-import mg.lagrace.api.services.RoomTypeService;
-import mg.lagrace.api.services.BookingPoolService;
-import mg.lagrace.api.services.BookingMeetingRoomService;
+import mg.lagrace.api.booking.charge.BookingCharge;
+import mg.lagrace.api.booking.core.Booking;
+import mg.lagrace.api.booking.core.BookingRepository;
+import mg.lagrace.api.booking.core.BookingStatusRepository;
+import mg.lagrace.api.catalog.additionalservice.AdditionalService;
+import mg.lagrace.api.catalog.space.BanquetRate;
+import mg.lagrace.api.catalog.space.Space;
+import mg.lagrace.api.catalog.space.SpaceRepository;
+import mg.lagrace.api.booking.dto.BookingBanquetCreateRequest;
+import mg.lagrace.api.booking.dto.BookingChargeUpdateRequest;
+import mg.lagrace.api.booking.dto.BookingChargeVoidRequest;
+import mg.lagrace.api.booking.dto.BookingChargeCreateRequest;
+import mg.lagrace.api.booking.dto.BookingDepositRequest;
+import mg.lagrace.api.booking.dto.BookingDepositReturnRequest;
+import mg.lagrace.api.booking.dto.BookingCancelRequest;
+import mg.lagrace.api.booking.dto.BookingCancellationFee;
+import mg.lagrace.api.booking.dto.BookingRoomCancelRequest;
+import mg.lagrace.api.booking.charge.persistence.BookingChargeRepository;
+import mg.lagrace.api.catalog.space.persistence.BanquetRateRepository;
+import mg.lagrace.api.catalog.additionalservice.persistence.AdditionalServiceRepository;
+import mg.lagrace.api.booking.charge.persistence.BookingOtherRepository;
+import mg.lagrace.api.payment.persistence.PaymentMethodRepository;
+import mg.lagrace.api.payment.persistence.PaymentRepository;
+import mg.lagrace.api.booking.dto.BookingSpaceUpdateRequest;
+import mg.lagrace.api.booking.application.BookingChargeService;
+import mg.lagrace.api.booking.application.BookingPaymentService;
+import mg.lagrace.api.booking.application.BookingCancellationService;
+import mg.lagrace.api.media.application.PhotoService;
+import mg.lagrace.api.booking.dto.space.BookingSpaceRequest;
+import mg.lagrace.api.booking.dto.pool.BookingPoolRequest;
+import mg.lagrace.api.booking.dto.meeting.BookingMeetingRoomRequest;
+import mg.lagrace.api.customer.persistence.CustomerRepository;
+import mg.lagrace.api.booking.application.BookingSpaceService;
+import mg.lagrace.api.booking.application.BookingSpaceActionService;
+import mg.lagrace.api.booking.application.BookingDetailService;
+import mg.lagrace.api.booking.dto.BookingStatusActionRequest;
+import mg.lagrace.api.booking.space.persistence.BookingSpaceRepository;
+import mg.lagrace.api.catalog.room.persistence.RoomDetailRepository;
+import mg.lagrace.api.catalog.room.persistence.RoomRepository;
+import mg.lagrace.api.catalog.room.persistence.RoomStatusHistoryRepository;
+import mg.lagrace.api.catalog.room.persistence.RoomStatusRepository;
+import mg.lagrace.api.catalog.room.persistence.RoomTypeRepository;
+import mg.lagrace.api.catalog.pool.persistence.PoolRepository;
+import mg.lagrace.api.catalog.pool.persistence.PoolServiceRepository;
+import mg.lagrace.api.catalog.pool.persistence.PoolRateRepository;
+import mg.lagrace.api.catalog.meetingroom.persistence.MeetingRoomRepository;
+import mg.lagrace.api.catalog.meetingroom.persistence.MeetingRoomServiceRepository;
+import mg.lagrace.api.catalog.meetingroom.persistence.MeetingRoomRateRepository;
+import mg.lagrace.api.auth.persistence.UserRepository;
+import mg.lagrace.api.catalog.room.application.RoomService;
+import mg.lagrace.api.catalog.room.application.RoomTypeService;
+import mg.lagrace.api.booking.application.BookingPoolService;
+import mg.lagrace.api.booking.application.BookingMeetingRoomService;
 
 @SpringBootTest
 @ExtendWith(MockitoExtension.class)
@@ -180,10 +189,10 @@ class LagraceApiApplicationTests {
     private RoomStatusHistoryRepository roomStatusHistoryRepository;
 
     @Mock
-    private Cloudinary cloudinary;
+    private RoomTypeService roomTypeService;
 
     @Mock
-    private RoomTypeService roomTypeService;
+    private PhotoService photoService;
 
     @Test
     void contextLoads() {
@@ -196,7 +205,7 @@ class LagraceApiApplicationTests {
             roomDetailRepository,
             roomStatusRepository,
             roomTypeRepository,
-            cloudinary,
+            photoService,
             roomStatusHistoryRepository,
             roomTypeService
         );
@@ -248,7 +257,7 @@ class LagraceApiApplicationTests {
             null
         );
 
-        var result = bookingSpaceService.createBooking(request, "ADMIN", false);
+        var result = bookingSpaceService.createBooking(request, "ADMIN");
 
         assertNotNull(result.ref());
         assertEquals("CONFIRMED", result.statusCode());
@@ -364,7 +373,7 @@ class LagraceApiApplicationTests {
             null
         );
 
-        var created = bookingSpaceService.createBooking(request, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(request, "ADMIN");
         var line = bookingSpaceRepository.findAllByBooking_IdBooking(created.id()).get(0);
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test",
             List.of(new SimpleGrantedAuthority("ROLE_Administrateur")));
@@ -400,7 +409,7 @@ class LagraceApiApplicationTests {
             .findFirst().orElseGet(() -> spaceRepository.findAll().stream()
                 .filter(candidate -> candidate.getCapacity() != null && candidate.getCapacity() >= 100)
                 .findFirst().orElseThrow());
-        var menuTypes = entityManager.createQuery("SELECT type FROM BanquetMenuType type", mg.lagrace.api.models.BanquetMenuType.class).getResultList();
+        var menuTypes = entityManager.createQuery("SELECT type FROM BanquetMenuType type", mg.lagrace.api.catalog.space.BanquetMenuType.class).getResultList();
         var allRates = banquetRateRepository.findAll();
         var tierPair = allRates.stream().filter(rate -> rate.getMaxPersons() != null)
             .flatMap(lower -> allRates.stream().filter(higher -> higher.getMenuType().getIdMenuType().equals(lower.getMenuType().getIdMenuType())
@@ -430,7 +439,7 @@ class LagraceApiApplicationTests {
             new BookingSpaceRequest.SpaceItem(space.getIdSpace(), null, eventDate, guestCount, true),
             List.of(new BookingSpaceRequest.BanquetItem(otherMenuType.getIdMenuType(), Math.min(90, guestCount))),
             null, null, null, null, null, true, null);
-        var created = bookingSpaceService.createBooking(createRequest, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(createRequest, "ADMIN");
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test");
 
         bookingChargeService.addBanquet(created.id(), new BookingBanquetCreateRequest(lowerTier.getMenuType().getIdMenuType(), lowerTier.getMaxPersons()), authentication);
@@ -472,7 +481,7 @@ class LagraceApiApplicationTests {
             new BookingSpaceRequest.SpaceItem(space.getIdSpace(), null, eventDate, 10, true),
             List.of(new BookingSpaceRequest.BanquetItem(1L, 10)),
             null, null, null, null, null, true, null);
-        var created = bookingSpaceService.createBooking(createRequest, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(createRequest, "ADMIN");
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test");
         var authorized = new UsernamePasswordAuthenticationToken("ADMIN", "test",
             List.of(new SimpleGrantedAuthority("ROLE_Administrateur")));
@@ -501,7 +510,7 @@ class LagraceApiApplicationTests {
 
         AdditionalService incompatible = additionalServiceRepository.findAll().stream()
             .filter(service -> service.isActive()
-                && service.getCateringCondition() == mg.lagrace.api.models.enums.CateringCondition.WITHOUT_CATERER
+                && service.getCateringCondition() == mg.lagrace.api.catalog.additionalservice.CateringCondition.WITHOUT_CATERER
                 && "SPACE".equalsIgnoreCase(service.getScope().getCode()))
             .findFirst().orElseThrow();
         var failure = assertThrows(mg.lagrace.api.exceptions.UnprocessableEntityException.class,
@@ -518,7 +527,7 @@ class LagraceApiApplicationTests {
             1L, null, null, "deposit-idempotency-test",
             new BookingSpaceRequest.SpaceItem(space.getIdSpace(), null, eventDate, 10, false),
             null, null, null, null, null, null, true, null);
-        var created = bookingSpaceService.createBooking(createRequest, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(createRequest, "ADMIN");
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test",
             List.of(new SimpleGrantedAuthority("ROLE_Administrateur")));
         Long methodId = paymentMethodRepository.findAll().stream().findFirst().orElseThrow().getIdMethod();
@@ -576,7 +585,7 @@ class LagraceApiApplicationTests {
             1L, null, null, "deposit-required-before-start-test",
             new BookingSpaceRequest.SpaceItem(space.getIdSpace(), null, LocalDate.now().plusMonths(6), 10, false),
             null, null, null, null, null, null, true, null);
-        var created = bookingSpaceService.createBooking(createRequest, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(createRequest, "ADMIN");
         var line = bookingSpaceRepository.findAllByBooking_IdBooking(created.id()).get(0);
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test",
             List.of(new SimpleGrantedAuthority("ROLE_Administrateur")));
@@ -601,7 +610,7 @@ class LagraceApiApplicationTests {
             1L, null, null, "space-cancellation-flow-test",
             new BookingSpaceRequest.SpaceItem(space.getIdSpace(), null, eventDate, 10, false),
             null, null, null, null, null, null, true, null);
-        var created = bookingSpaceService.createBooking(createRequest, "ADMIN", false);
+        var created = bookingSpaceService.createBooking(createRequest, "ADMIN");
         var authentication = new UsernamePasswordAuthenticationToken("ADMIN", "test",
             List.of(new SimpleGrantedAuthority("ROLE_Administrateur")));
         AdditionalService spaceService = additionalServiceRepository.findAll().stream()

@@ -1,0 +1,64 @@
+package mg.lagrace.api.billing.application;
+
+import mg.lagrace.api.catalog.meetingroom.MeetingRoom;
+import mg.lagrace.api.catalog.pool.Pool;
+import mg.lagrace.api.catalog.room.Room;
+import mg.lagrace.api.catalog.space.Space;
+import mg.lagrace.api.dashboard.persistence.BookingBalanceRepository;
+import mg.lagrace.api.payment.PaymentMethod;
+import mg.lagrace.api.payment.persistence.PaymentRepository;
+
+import mg.lagrace.api.billing.dto.invoice.BillableItemsResponse;
+import mg.lagrace.api.billing.dto.invoice.InvoiceDetailResponse;
+import mg.lagrace.api.billing.persistence.InvoiceLineRepository;
+import mg.lagrace.api.billing.persistence.InvoiceRepository;
+import mg.lagrace.api.billing.persistence.InvoiceSummaryRepository;
+import mg.lagrace.api.booking.charge.persistence.BookingChargeRepository;
+import mg.lagrace.api.booking.charge.persistence.BookingOtherRepository;
+import mg.lagrace.api.booking.meetingroom.persistence.BookingMeetingRoomRepository;
+import mg.lagrace.api.booking.pool.persistence.BookingPoolRepository;
+import mg.lagrace.api.booking.room.persistence.BookingRoomRepository;
+import mg.lagrace.api.booking.space.persistence.BookingSpaceRepository;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import mg.lagrace.api.billing.Invoice;
+import mg.lagrace.api.billing.InvoiceSummary;
+import mg.lagrace.api.booking.charge.BookingCharge;
+import mg.lagrace.api.booking.core.Booking;
+import mg.lagrace.api.booking.core.BookingRepository;
+import mg.lagrace.api.customer.Customer;
+import mg.lagrace.api.dashboard.BookingBalance;
+import mg.lagrace.api.billing.dto.invoice.*;
+import mg.lagrace.api.exceptions.ResourceNotFoundException;
+import mg.lagrace.api.billing.application.InvoiceLineDescriptionGenerator;
+import mg.lagrace.api.payment.Payment;
+
+@Service
+@Transactional(readOnly = true)
+public class BillingReadService {
+ private final BookingRepository bookings; private final BookingRoomRepository rooms; private final BookingPoolRepository pools; private final BookingMeetingRoomRepository meetingRooms; private final BookingSpaceRepository spaces; private final BookingChargeRepository charges; private final BookingOtherRepository others; private final PaymentRepository payments; private final BookingBalanceRepository balances; private final InvoiceRepository invoices; private final InvoiceLineRepository invoiceLines; private final InvoiceSummaryRepository summaries;
+ public BillingReadService(BookingRepository bookings, BookingRoomRepository rooms, BookingPoolRepository pools, BookingMeetingRoomRepository meetingRooms, BookingSpaceRepository spaces, BookingChargeRepository charges, BookingOtherRepository others, PaymentRepository payments, BookingBalanceRepository balances, InvoiceRepository invoices, InvoiceLineRepository invoiceLines, InvoiceSummaryRepository summaries) { this.bookings=bookings;this.rooms=rooms;this.pools=pools;this.meetingRooms=meetingRooms;this.spaces=spaces;this.charges=charges;this.others=others;this.payments=payments;this.balances=balances;this.invoices=invoices;this.invoiceLines=invoiceLines;this.summaries=summaries; }
+ public BillableItemsResponse billableItems(Long bookingId) {
+  Booking booking=bookings.findById(bookingId).orElseThrow(()->new ResourceNotFoundException("Dossier introuvable avec l'id : "+bookingId));
+  List<BillableItemsResponse.Item> items=new ArrayList<>();
+  rooms.findAllByBooking_IdBooking(bookingId).stream().filter(x->active(x.getActive(),x.getStatus().getCode())&&!billed("ROOM",x.getIdBookingRoom())).forEach(x->items.add(item("ROOM",x.getIdBookingRoom(),"ROOM",InvoiceLineDescriptionGenerator.room(x.getRoom().getType().getName(),x.getRoom().getRefRoom(),x.getCheckIn(),x.getCheckOut(),x.getNights(),Boolean.TRUE.equals(x.getIncluded())),bd(x.getNights()),x.getUnitPrice(),x.getAmount(),x.getIncluded())));
+  pools.findAllByBooking_IdBooking(bookingId).stream().filter(x->active(x.getActive(),x.getStatus().getCode())&&!billed("POOL",x.getIdBookingPool())).forEach(x->items.add(item("POOL",x.getIdBookingPool(),"POOL",InvoiceLineDescriptionGenerator.pool(x.getPool().getName(),x.getPoolService().getName(),x.getStartsAt().toLocalDate(),Boolean.TRUE.equals(x.getIncluded())),bd(x.getQuantity()),x.getUnitPrice(),x.getAmount(),x.getIncluded())));
+  meetingRooms.findAllByBooking_IdBooking(bookingId).stream().filter(x->active(x.getActive(),x.getStatus().getCode())&&!billed("MEETING_ROOM",x.getIdBookingMeetingRoom())).forEach(x->items.add(item("MEETING_ROOM",x.getIdBookingMeetingRoom(),"MEETING_ROOM",InvoiceLineDescriptionGenerator.meetingRoom(x.getMeetingRoom().getName(),x.getMeetingRoomService().getName(),x.getServiceDate(),Boolean.TRUE.equals(x.getIncluded())),bd(x.getQuantity()),x.getUnitPrice(),x.getAmount(),x.getIncluded())));
+  spaces.findAllByBooking_IdBooking(bookingId).stream().filter(x->active(x.getActive(),x.getStatus().getCode())&&!billed("SPACE",x.getIdBookingSpace())).forEach(x->items.add(item("SPACE",x.getIdBookingSpace(),"SPACE",InvoiceLineDescriptionGenerator.space(x.getSpace().getName(),x.getEventType()==null?null:x.getEventType().getName(),x.getEventDate(),Boolean.TRUE.equals(x.getIncluded())),bd(x.getQuantity()),x.getUnitPrice(),x.getAmount(),x.getIncluded())));
+  charges.findAllByBooking_IdBooking(bookingId).stream().filter(x->x.getVoidedAt()==null&&!Boolean.TRUE.equals(x.getDeposit())&&!billed("CHARGE",x.getIdBookingCharge())).forEach(x->items.add(item("CHARGE",x.getIdBookingCharge(),chargeCode(x),InvoiceLineDescriptionGenerator.charge(x.getLabel(),Boolean.TRUE.equals(x.getIncluded())),bd(x.getQuantity()),x.getUnitPrice(),x.getAmount(),x.getIncluded())));
+  others.findAllByBooking_IdBookingOrderByCreatedAtDesc(bookingId).stream().filter(x->x.getVoidedAt()==null&&!billed("OTHER",x.getIdBookingOther())).forEach(x->items.add(item("OTHER",x.getIdBookingOther(),"OTHER",InvoiceLineDescriptionGenerator.other(x.getLabel()),BigDecimal.ONE,x.getAmount(),x.getAmount(),false)));
+  List<BillableItemsResponse.Item> discounts=items.stream().filter(x->x.amount().signum()<0).toList(); List<BillableItemsResponse.Item> regular=items.stream().filter(x->x.amount().signum()>=0).toList();
+  Customer c=booking.getCustomer(); String name=String.join(" ",Arrays.asList(c.getFirstName(),c.getLastName()).stream().filter(Objects::nonNull).toList());
+  var paymentMethods=payments.findAllByBooking_IdBooking(bookingId).stream().filter(p->Set.of("PAYMENT","ADVANCE","REFUND").contains(p.getKind().getCode())).collect(Collectors.groupingBy(p->p.getMethod().getName(),Collectors.reducing(BigDecimal.ZERO,p->signed(p),BigDecimal::add))).entrySet().stream().map(e->new BillableItemsResponse.PaymentMethod(e.getKey(),e.getValue())).toList();
+  BigDecimal paid=balances.findById(bookingId).map(BookingBalance::getPaid).orElse(BigDecimal.ZERO);
+  LocalDate[] period=period(bookingId); return new BillableItemsResponse(new BillableItemsResponse.Customer(name,c.getPhone(),c.getNationality()==null?null:c.getNationality().getName()),booking.getRef(),period[0],period[1],new BillableItemsResponse.PaymentsSummary(paid,paymentMethods),regular,discounts);
+ }
+ public InvoiceDetailResponse invoiceDetail(Long id) { Invoice i=invoices.findById(id).orElseThrow(()->new ResourceNotFoundException("Facture introuvable avec l'id : "+id)); InvoiceSummary s=summaries.findById(id).orElseThrow(()->new ResourceNotFoundException("Résumé de facture introuvable.")); List<InvoiceDetailResponse.Line> lines=invoiceLines.findAllByInvoice_IdInvoiceOrderByPositionAsc(id).stream().map(l->new InvoiceDetailResponse.Line(l.getIdInvoiceLine(),l.getDescription(),l.getQuantity(),l.getUnitPrice(),l.getAmount(),l.getPosition(),l.getServiceCode(),l.getSourceType(),l.getSourceId(),l.getBilled(),l.getCreditedLine()==null?null:l.getCreditedLine().getIdInvoiceLine())).toList(); List<InvoiceDetailResponse.Credit> credits=invoices.findAllByCreditedInvoice_IdInvoice(id).stream().map(c->new InvoiceDetailResponse.Credit(c.getIdInvoice(),c.getInvoiceNumber(),c.getTotal(),c.getIssueDate())).toList(); List<String> methods=payments.findAllByBooking_IdBooking(i.getBooking().getIdBooking()).stream().filter(p->Set.of("PAYMENT","ADVANCE").contains(p.getKind().getCode())).map(p->p.getMethod().getName()).distinct().toList(); BigDecimal paid=nvl(s.getPaidOnInvoice()); return new InvoiceDetailResponse(i.getIdInvoice(),i.getInvoiceNumber(),i.getInvoiceType(),i.getStatus().getCode(),i.getIssueDate(),i.getBooking().getIdBooking(),i.getCustomer().getIdCustomer(),i.getBillingName(),i.getBillingAddress(),i.getBillingPhone(),i.getBillingNationality(),i.getBillingTaxId(),i.getReferenceLabel(),i.getPeriodStart(),i.getPeriodEnd(),i.getSubtotal(),i.getDiscount(),i.getTotal(),i.getNotes(),i.getIssuerSnapshot(),s.getPaymentStatus(),paid,nvl(s.getNetTotal()).subtract(paid),i.getCreditedInvoice()==null?null:i.getCreditedInvoice().getInvoiceNumber(),credits,lines,methods,i.getCreatedAt()); }
+ private boolean billed(String type,Long id){return invoiceLines.existsBySourceTypeAndSourceIdAndBilledTrue(type,id);} private boolean active(Boolean active,String status){return Boolean.TRUE.equals(active)&&!"CANCELED".equals(status);} private static BigDecimal bd(Integer n){return BigDecimal.valueOf(n==null?1:n);} private static BigDecimal nvl(BigDecimal n){return n==null?BigDecimal.ZERO:n;} private static BigDecimal signed(Payment p){return "REFUND".equals(p.getKind().getCode())?p.getAmount().negate():p.getAmount();} private static String chargeCode(BookingCharge x){return x.getMenuItem()!=null?"RESTAURANT":"EXTRA";} private static BillableItemsResponse.Item item(String t,Long id,String code,String d,BigDecimal q,BigDecimal price,BigDecimal amount,Boolean included){boolean offered=Boolean.TRUE.equals(included); BigDecimal safePrice=nvl(price); BigDecimal safeAmount=amount==null?safePrice.multiply(q):amount; return new BillableItemsResponse.Item(t,id,code,d,q,offered?BigDecimal.ZERO:safePrice,offered?BigDecimal.ZERO:safeAmount,offered);} private LocalDate[] period(Long id){List<LocalDate> d=new ArrayList<>();rooms.findAllByBooking_IdBooking(id).forEach(x->{d.add(x.getCheckIn());d.add(x.getCheckOut());});pools.findAllByBooking_IdBooking(id).forEach(x->d.add(x.getStartsAt().toLocalDate()));meetingRooms.findAllByBooking_IdBooking(id).forEach(x->d.add(x.getServiceDate()));spaces.findAllByBooking_IdBooking(id).forEach(x->d.add(x.getEventDate()));return d.isEmpty()?new LocalDate[]{null,null}:new LocalDate[]{Collections.min(d),Collections.max(d)};}
+}

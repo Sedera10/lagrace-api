@@ -1,5 +1,10 @@
 package mg.lagrace.api.services;
 
+import mg.lagrace.api.billing.Invoice;
+import mg.lagrace.api.catalog.room.Room;
+
+import mg.lagrace.api.billing.application.InvoiceArchiveService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -14,9 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import mg.lagrace.api.dto.invoice.InvoiceArchiveResponse;
+import mg.lagrace.api.billing.dto.invoice.InvoiceArchiveResponse;
 import mg.lagrace.api.exceptions.ValidationException;
-import mg.lagrace.api.repositories.InvoiceArchiveRepository;
+import mg.lagrace.api.billing.persistence.InvoiceArchiveRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceArchiveServiceTest {

@@ -1,7 +1,7 @@
 package mg.lagrace.api.catalog.room;
 
 import jakarta.persistence.*;
-import mg.lagrace.api.models.Unit;
+import mg.lagrace.api.reference.Unit;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

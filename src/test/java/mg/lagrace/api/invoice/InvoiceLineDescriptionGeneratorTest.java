@@ -1,5 +1,11 @@
 package mg.lagrace.api.invoice;
 
+import mg.lagrace.api.billing.Invoice;
+import mg.lagrace.api.catalog.meetingroom.MeetingRoom;
+import mg.lagrace.api.catalog.room.Room;
+
+import mg.lagrace.api.billing.application.InvoiceLineDescriptionGenerator;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;

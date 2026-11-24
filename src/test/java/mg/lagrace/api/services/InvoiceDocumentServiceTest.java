@@ -1,5 +1,9 @@
 package mg.lagrace.api.services;
 
+import mg.lagrace.api.employee.Document;
+
+import mg.lagrace.api.billing.application.InvoiceDocumentService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,14 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import tools.jackson.databind.ObjectMapper;
-
-import mg.lagrace.api.models.Invoice;
-import mg.lagrace.api.models.InvoiceLine;
-import mg.lagrace.api.models.InvoiceStatus;
-import mg.lagrace.api.models.views.InvoiceSummary;
-import mg.lagrace.api.repositories.InvoiceLineRepository;
-import mg.lagrace.api.repositories.InvoiceRepository;
-import mg.lagrace.api.repositories.InvoiceSummaryRepository;
+import mg.lagrace.api.billing.Invoice;
+import mg.lagrace.api.billing.InvoiceLine;
+import mg.lagrace.api.billing.InvoiceStatus;
+import mg.lagrace.api.billing.InvoiceSummary;
+import mg.lagrace.api.billing.persistence.InvoiceLineRepository;
+import mg.lagrace.api.billing.persistence.InvoiceRepository;
+import mg.lagrace.api.billing.persistence.InvoiceSummaryRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceDocumentServiceTest {

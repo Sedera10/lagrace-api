@@ -1,5 +1,9 @@
 package mg.lagrace.api.services;
 
+import mg.lagrace.api.booking.core.Booking;
+import mg.lagrace.api.dashboard.dto.dashboard.DashboardDtos;
+import mg.lagrace.api.reporting.application.ReportingService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -20,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 
-import mg.lagrace.api.dto.dashboard.DashboardDtos.*;
+import mg.lagrace.api.dashboard.dto.dashboard.DashboardDtos.*;
 
 class ReportingServiceTest {
     private ReportingService service;

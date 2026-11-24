@@ -1,5 +1,8 @@
 package mg.lagrace.api.services;
 
+import mg.lagrace.api.dashboard.application.DashbordService;
+import mg.lagrace.api.reporting.application.ReportingService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
@@ -16,8 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import mg.lagrace.api.dto.dashboard.DashboardDtos;
-import mg.lagrace.api.repositories.DashboardNativeRepository;
+import mg.lagrace.api.dashboard.dto.dashboard.DashboardDtos;
+import mg.lagrace.api.dashboard.persistence.DashboardNativeRepository;
 
 @ExtendWith(MockitoExtension.class)
 class DashbordServiceTest {

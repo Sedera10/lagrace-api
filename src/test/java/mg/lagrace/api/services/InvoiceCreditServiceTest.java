@@ -1,5 +1,11 @@
 package mg.lagrace.api.services;
 
+import mg.lagrace.api.reference.HotelSettings;
+
+import mg.lagrace.api.billing.application.BillingReadService;
+import mg.lagrace.api.billing.application.InvoiceCreditService;
+import mg.lagrace.api.booking.application.BookingChangeLogger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -23,20 +29,20 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import mg.lagrace.api.dto.invoice.CreditNoteRequest;
-import mg.lagrace.api.dto.invoice.InvoiceDetailResponse;
-import mg.lagrace.api.models.Booking;
-import mg.lagrace.api.models.Invoice;
-import mg.lagrace.api.models.InvoiceLine;
-import mg.lagrace.api.models.InvoiceStatus;
-import mg.lagrace.api.models.User;
-import mg.lagrace.api.models.views.InvoiceSummary;
-import mg.lagrace.api.repositories.HotelSettingsRepository;
-import mg.lagrace.api.repositories.InvoiceLineRepository;
-import mg.lagrace.api.repositories.InvoiceRepository;
-import mg.lagrace.api.repositories.InvoiceStatusRepository;
-import mg.lagrace.api.repositories.InvoiceSummaryRepository;
-import mg.lagrace.api.repositories.UserRepository;
+import mg.lagrace.api.auth.User;
+import mg.lagrace.api.billing.Invoice;
+import mg.lagrace.api.billing.InvoiceLine;
+import mg.lagrace.api.billing.InvoiceStatus;
+import mg.lagrace.api.billing.InvoiceSummary;
+import mg.lagrace.api.booking.core.Booking;
+import mg.lagrace.api.billing.dto.invoice.CreditNoteRequest;
+import mg.lagrace.api.billing.dto.invoice.InvoiceDetailResponse;
+import mg.lagrace.api.reference.system.persistence.HotelSettingsRepository;
+import mg.lagrace.api.billing.persistence.InvoiceLineRepository;
+import mg.lagrace.api.billing.persistence.InvoiceRepository;
+import mg.lagrace.api.billing.persistence.InvoiceStatusRepository;
+import mg.lagrace.api.billing.persistence.InvoiceSummaryRepository;
+import mg.lagrace.api.auth.persistence.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceCreditServiceTest {
@@ -94,7 +100,7 @@ class InvoiceCreditServiceTest {
         InvoiceSummary before = summary(new BigDecimal("60.00"), new BigDecimal("60.00"));
         InvoiceSummary after = summary(BigDecimal.ZERO, BigDecimal.ZERO);
         when(summaries.findById(12L)).thenReturn(Optional.of(before), Optional.of(after));
-        when(settings.findById(1L)).thenReturn(Optional.of(org.mockito.Mockito.mock(mg.lagrace.api.models.HotelSettings.class)));
+        when(settings.findById(1L)).thenReturn(Optional.of(org.mockito.Mockito.mock(mg.lagrace.api.reference.HotelSettings.class)));
         when(invoices.saveAndFlush(any(Invoice.class))).thenAnswer(invocation -> {
             Invoice invoice = invocation.getArgument(0);
             if ("CREDIT_NOTE".equals(invoice.getInvoiceType())) {

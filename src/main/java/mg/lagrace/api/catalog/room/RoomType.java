@@ -1,7 +1,6 @@
 package mg.lagrace.api.catalog.room;
 
 import jakarta.persistence.*;
-import mg.lagrace.api.models.Equipment;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;

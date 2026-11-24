@@ -1,7 +1,7 @@
 package mg.lagrace.api.exceptions;
 
 import java.sql.SQLException;
-import mg.lagrace.api.dto.ApiResponse;
+import mg.lagrace.api.shared.api.ApiResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
@@ -61,6 +61,8 @@ public class GlobalExceptionHandler {
         String constraint = constraintName(ex);
         if ("uq_customer_document".equals(constraint))
             return response(HttpStatus.CONFLICT, "DUPLICATE_DOCUMENT", "Cette pièce d’identité est déjà associée à un client.");
+        if ("no_overlap_leave".equals(constraint))
+            return response(HttpStatus.CONFLICT, "LEAVE_OVERLAP", "Ce congé chevauche un congé existant.");
         if ("23P01".equals(sqlState) || "no_double_room".equals(constraint))
             return response(HttpStatus.CONFLICT, "ROOM_UNAVAILABLE", "Une autre réservation chevauche la période demandée pour cette chambre.");
         if ("uq_space_day".equals(constraint))

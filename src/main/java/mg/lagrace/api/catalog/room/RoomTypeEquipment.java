@@ -1,7 +1,6 @@
 package mg.lagrace.api.catalog.room;
 
 import jakarta.persistence.*;
-import mg.lagrace.api.models.Equipment;
 
 @Entity
 @Table(name = "room_type_equipment")

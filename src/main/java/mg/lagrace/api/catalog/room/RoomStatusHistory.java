@@ -1,7 +1,7 @@
 package mg.lagrace.api.catalog.room;
 
 import jakarta.persistence.*;
-import mg.lagrace.api.models.User;
+import mg.lagrace.api.auth.User;
 
 import java.time.OffsetDateTime;
 

@@ -3,8 +3,6 @@ package mg.lagrace.api.catalog.room;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "room")
@@ -42,9 +40,6 @@ public class Room {
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
-
-    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RoomPhoto> photos = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -88,18 +83,5 @@ public class Room {
 
     public OffsetDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
-
-    public List<RoomPhoto> getPhotos() { return photos; }
-    public void setPhotos(List<RoomPhoto> photos) { this.photos = photos; }
-
-    public void addPhoto(RoomPhoto photo) {
-        photos.add(photo);
-        photo.setRoom(this);
-    }
-
-    public void removePhoto(RoomPhoto photo) {
-        photos.remove(photo);
-        photo.setRoom(null);
-    }
 
 }
